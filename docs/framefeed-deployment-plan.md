@@ -35,3 +35,13 @@ The current `open-photo-journal` v0.1 application describes itself as **one pers
 - [ ] Backup and rollback tested
 
 Development notes: `README.md`, `vite.config.ts`, `.openai/hosting.json` and `.dev.vars.example` document the current app and binding constraints.
+
+## Prepared GitHub-build commands
+
+The experimental standalone deployment on this branch now has an opt-in build profile:
+- Build: `FRAMEFEED_DEPLOY=1 pnpm run build`
+- Deploy: `node scripts/deploy-framefeed.mjs`
+
+The deploy script refuses to run unless the generated Cloudflare Worker is named `framefeed`, the D1 binding is `DB` with database `framefeed-db` and ID `2d43ec6a-9a00-425e-8497-2495a55f2d65`, and the R2 binding is `BUCKET` with bucket `framefeed-media`.
+
+**Important:** This is an untested deployment candidate, not a verified production build. The build may still require migration away from ChatGPT Sites-specific plugins and the current vinext packaging. Do not change DNS or import private data until test deployment checks pass. Cloudflare's initial repository-connect UI may select `main` by default; do not run the default deploy while these changes exist only on `prepare-framefeed-cloudflare`. Cloudflare supports changing the production branch under Worker Settings → Build → Branch control **after** a Worker is created.
