@@ -86,9 +86,10 @@ pnpm dev
 ## Deployment
 
 The present v0.1 deployment path is ChatGPT Sites, which provisions the D1 and
-R2 bindings declared in `.openai/hosting.json`. When creating a separate Site,
-replace its `project_id` through the Sites workflow; never reuse another
-installation's project ID or data resources.
+R2 bindings declared in `.openai/hosting.json`. The public template deliberately
+contains no `project_id`: creating a new Site from the source assigns a fresh ID
+and fresh data resources to that installation. Never copy a `project_id` from
+another deployment.
 
 The runtime is Cloudflare-native. A documented standalone Cloudflare deployment
 path and automated resource bootstrap are planned before v1.0; until that is

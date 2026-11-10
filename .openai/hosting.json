@@ -1,5 +1,4 @@
 {
   "d1": "DB",
-  "r2": "MEDIA",
-  "project_id": "replace-with-your-sites-project-id"
+  "r2": "BUCKET"
 }
