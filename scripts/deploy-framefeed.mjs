@@ -3,7 +3,7 @@
 // placeholder ChatGPT Sites resources or the expected Worker was not produced.
 import { readFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-const configPath = "dist/framefeed/wrangler.json";
+const configPath = "dist/server/wrangler.json";
 if (!existsSync(configPath)) {
   console.error("FrameFeed build output missing: " + configPath + ". Build with FRAMEFEED_DEPLOY=1 pnpm run build first.");
   process.exit(1);
