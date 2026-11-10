@@ -2,6 +2,12 @@
 
 Domain confirmed: framefeed.co.uk.
 
+Provisioned Cloudflare resources (user confirmed):
+- D1 database: `framefeed-db` — database ID `2d43ec6a-9a00-425e-8497-2495a55f2d65`, binding `DB`.
+- R2 private bucket: `framefeed-media`, binding `BUCKET`.
+
+The database ID is an identifier, not a credential. No Cloudflare API tokens, authentication secrets or private photo data belong in this repository.
+
 ## Hostnames
 - `https://framefeed.co.uk/`: platform landing page; sign up and log in.
 - `https://toby.framefeed.co.uk/`: Toby's public profile, post grid, feed and permanent post pages.
