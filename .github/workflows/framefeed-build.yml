@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - prepare-framefeed-cloudflare
+      - main
     paths:
+      - 'app/**'
+      - 'cloudflare-env.d.ts'
+      - 'drizzle/**'
       - 'vite.config.ts'
       - 'scripts/**'
       - 'worker/**'
