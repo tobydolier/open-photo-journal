@@ -2,6 +2,9 @@ import { env } from "cloudflare:workers";
 
 const json = (message:string,status:number) => Response.json({message},{status,headers:{"Cache-Control":"no-store"}});
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export async function GET(){
+  return Response.json({enabled:env.WAITLIST_ENABLED==="1" && Boolean(env.TURNSTILE_SECRET_KEY && env.TURNSTILE_SITE_KEY),siteKey:env.TURNSTILE_SITE_KEY||""},{headers:{"Cache-Control":"no-store"}});
+}
 export async function POST(request:Request){
   const origin = new URL(request.url).origin;
   if(request.headers.get("origin") !== origin) return json("Invalid request origin.",403);
