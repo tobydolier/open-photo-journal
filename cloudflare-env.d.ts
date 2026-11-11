@@ -19,5 +19,6 @@ declare namespace Cloudflare {
     WAITLIST_ENABLED?: string;
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;
+    LANDING_FEATURED_MEDIA_KEYS?: string;
   }
 }
