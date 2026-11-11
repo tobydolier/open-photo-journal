@@ -54,7 +54,7 @@ export default function WelcomePage(){
       <section className="ff-intro">
         <p className="ff-eyebrow">A NEW HOME FOR PHOTOGRAPHS</p>
         <h1>Your photographs deserve <em>a little wall space.</em></h1>
-        <p className="ff-deck">A home for the moments worth keeping. Put your photographs in the picture, choose a frame, and share your own corner of the web.</p>
+        <p className="ff-deck">A home for the moments worth keeping. Choose a frame, arrange your own gallery, and share your corner of the web. No algorithm deciding what belongs at the top.</p>
         <div className="ff-cta"><a className="ff-button" href="#interest">Get early access <span aria-hidden="true">↗</span></a><a className="ff-secondary" href="#gallery">Take a look around ↓</a></div>
       </section>
       <section id="gallery" className="ff-gallery" aria-label="Frame styles">
@@ -70,6 +70,10 @@ export default function WelcomePage(){
           </div>)}
         </div>
         <p className="ff-gallery-foot">A preview of the frames. Real landscape photographs will replace these placeholders when we select images from the archive.</p>
+      </section>
+      <section className="ff-control" aria-labelledby="ff-control-title">
+        <div className="ff-control-mark" aria-hidden="true">↕</div>
+        <div><p className="ff-eyebrow">YOUR PHOTOS, YOUR ORDER</p><h2 id="ff-control-title">No algorithm. You're the curator.</h2><p>Nothing gets pushed up because it's popular. Arrange your posts exactly how you want them, and change the order whenever you like. Your gallery, your rules.</p></div>
       </section>
       <section id="interest" className="ff-interest">
         <div><p className="ff-eyebrow">BE FIRST THROUGH THE DOOR</p><h2>A gallery of your own is coming.</h2><p>We'll let you know when FrameFeed opens for new photographers. Just your email for now — no account or password needed.</p></div>
