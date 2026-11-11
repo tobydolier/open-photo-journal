@@ -23,6 +23,14 @@ const worker = {
         },
       };
     }
+    // Keep Workers development URL on the original photo journal. The apex
+    // domain becomes the platform landing; personal subdomains stay journals.
+    const url = new URL(request.url);
+    const host = url.hostname.toLowerCase();
+    if ((host === "framefeed.co.uk" || host === "www.framefeed.co.uk") && url.pathname === "/") {
+      url.pathname = "/welcome";
+      request = new Request(url.toString(), request);
+    }
     return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
   },
 };
