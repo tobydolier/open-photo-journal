@@ -11,19 +11,27 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
+// FrameFeed's standalone Worker is opt-in. The existing ChatGPT Sites build
+// retains its original isolated placeholder resources unless explicitly built
+// with FRAMEFEED_DEPLOY=1.
+const framefeedDeploy = process.env.FRAMEFEED_DEPLOY === "1";
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
 const localBindingConfig = {
+  ...(framefeedDeploy ? { name: "framefeed" } : {}),
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   d1_databases: d1
     ? [
         {
           binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          database_name: framefeedDeploy ? "framefeed-db" : "site-creator-d1",
+          database_id: framefeedDeploy
+            ? "2d43ec6a-9a00-425e-8497-2495a55f2d65"
+            : SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
         },
       ]
     : [],
@@ -31,7 +39,7 @@ const localBindingConfig = {
     ? [
         {
           binding: r2,
-          bucket_name: "site-creator-r2",
+          bucket_name: framefeedDeploy ? "framefeed-media" : "site-creator-r2",
         },
       ]
     : [],
