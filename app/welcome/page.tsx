@@ -16,10 +16,10 @@ export default function WelcomePage(){
   const[signupEnabled,setSignupEnabled]=useState(false);
   const[siteKey,setSiteKey]=useState("");
   const[token,setToken]=useState("");
-  const[featuredPhotos,setFeaturedPhotos]=useState<string[]>([]);
+  const[featuredPhotos,setFeaturedPhotos]=useState<Array<null|{src:string;caption:string;postId:string;key:string}>>([null,null,null]);
   const captchaRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
-    fetch("/api/landing-photos").then(r=>r.json()).then((v:{photos:string[]})=>setFeaturedPhotos(v.photos||[])).catch(()=>{});
+    fetch("/api/landing-photos").then(r=>r.json()).then((v:{photos:Array<null|{src:string;caption:string;postId:string;key:string}>})=>setFeaturedPhotos(v.photos||[null,null,null])).catch(()=>{});
   },[]);
   useEffect(()=>{
     fetch("/api/interest").then(r=>r.json()).then((v:{enabled:boolean,siteKey:string})=>{
@@ -67,13 +67,13 @@ export default function WelcomePage(){
           {photos.map((photo,i)=><div className={"ff-artwork ff-artwork-"+photo.cls} key={photo.cls}>
             <div className={"ff-frame ff-frame-"+photo.cls}>
               <div className="ff-mount">
-                <div className={"ff-art ff-art-"+i} role="img" aria-label={featuredPhotos[i] ? photo.title+" frame displaying a landscape photograph" : photo.alt}>{featuredPhotos[i] ? <img src={featuredPhotos[i]} alt="Curated landscape photograph" loading="lazy" /> : <span>YOUR LANDSCAPE HERE</span>}</div>
+                <div className={"ff-art ff-art-"+i} role="img" aria-label={featuredPhotos[i] ? photo.title+" frame displaying a featured photograph" : photo.alt}>{featuredPhotos[i] ? <img src={featuredPhotos[i]!.src} alt={featuredPhotos[i]!.caption} loading="lazy" /> : <span>YOUR LANDSCAPE HERE</span>}</div>
               </div>
             </div>
             <div className="ff-art-label"><b>{photo.title}</b><small>Change the look, whenever you like.</small></div>
           </div>)}
         </div>
-        <p className="ff-gallery-foot">A preview of the frames. Featured photographs are selected by the gallery owner.</p>
+        <p className="ff-gallery-foot">These framed photographs are selected directly from Toby’s own photo feed.</p>
       </section>
       <section className="ff-control" aria-labelledby="ff-control-title">
         <div className="ff-control-mark" aria-hidden="true">↕</div>
