@@ -16,5 +16,8 @@ declare namespace Cloudflare {
     ADMIN_EMAIL?: string;
     ADMIN_PASSWORD?: string;
     ADMIN_SESSION_SECRET?: string;
+    WAITLIST_ENABLED?: string;
+    TURNSTILE_SITE_KEY?: string;
+    TURNSTILE_SECRET_KEY?: string;
   }
 }
