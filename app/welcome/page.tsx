@@ -1,5 +1,5 @@
 "use client";
-import {useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import "./landing.css";
 
 const photos = [
@@ -13,12 +13,35 @@ export default function WelcomePage(){
   const[busy,setBusy]=useState(false);
   const[status,setStatus]=useState("");
   const[ok,setOk]=useState(false);
+  const[signupEnabled,setSignupEnabled]=useState(false);
+  const[siteKey,setSiteKey]=useState("");
+  const[token,setToken]=useState("");
+  const captchaRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    fetch("/api/interest").then(r=>r.json()).then((v:{enabled:boolean,siteKey:string})=>{
+      setSignupEnabled(v.enabled);setSiteKey(v.siteKey);
+    }).catch(()=>setSignupEnabled(false));
+  },[]);
+  useEffect(()=>{
+    if(!siteKey||!signupEnabled) return;
+    let cancelled=false;
+    const script=document.createElement("script");
+    script.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async=true;
+    script.onload=()=>{
+      if(cancelled||!captchaRef.current)return;
+      const turnstile=(window as Window & {turnstile?:{render:(target:HTMLElement,opts:{sitekey:string,callback:(t:string)=>void,"expired-callback":()=>void})=>unknown}}).turnstile;
+      turnstile?.render(captchaRef.current,{sitekey:siteKey,callback:setToken,"expired-callback":()=>setToken("")});
+    };
+    document.head.appendChild(script);
+    return ()=>{cancelled=true;script.remove();};
+  },[siteKey,signupEnabled]);
   async function submit(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();
     if(!consent)return;
     setBusy(true);setStatus("");
     try{
-      const res=await fetch("/api/interest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,consent,website:""})});
+      const res=await fetch("/api/interest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,consent,website:"",turnstileToken:token})});
       const data=await res.json() as {message?:string};
       if(!res.ok)throw Error(data.message||"Couldn't register your interest.");
       setOk(true);setStatus("Thank you — we've noted your interest.");
@@ -52,7 +75,8 @@ export default function WelcomePage(){
         <div><p className="ff-eyebrow">BE FIRST THROUGH THE DOOR</p><h2>A gallery of your own is coming.</h2><p>We'll let you know when FrameFeed opens for new photographers. Just your email for now — no account or password needed.</p></div>
         <form className="ff-form" onSubmit={submit}>
           <label htmlFor="ff-email">Your email address</label>
-          <div className="ff-inputline"><input id="ff-email" type="email" required maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" disabled={busy||ok}/><button type="submit" disabled={!consent||busy||ok}>{busy?"Sending…":ok?"Thank you!":"Register interest"} <span aria-hidden="true">↗</span></button></div>
+          <div className="ff-inputline"><input id="ff-email" type="email" required maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" disabled={busy||ok||!signupEnabled}/><button type="submit" disabled={!consent||busy||ok||!signupEnabled||!token}>{busy?"Sending…":ok?"Thank you!":"Register interest"} <span aria-hidden="true">↗</span></button></div>
+          {signupEnabled ? <div className="ff-captcha" ref={captchaRef} aria-label="Security verification"/> : <p className="ff-unavailable">The early list is being prepared. Registration will open soon.</p>}
           <label className="ff-consent"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} disabled={busy||ok}/> I'd like to hear when FrameFeed opens. My email will only be used for launch updates.</label>
           <p className="ff-privacy">We won't sell your email or send unrelated marketing. You can request removal at any time. <a href="mailto:privacy@framefeed.co.uk">Contact us</a>.</p>
           <p className="ff-status" role="status" aria-live="polite">{status}</p>
