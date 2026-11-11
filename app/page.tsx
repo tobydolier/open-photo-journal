@@ -120,11 +120,19 @@ async function compress(file: File) {
   });
 }
 
-function Photo({ post, siteName }: { post: Post; siteName: string }) {
+function Photo({ post, siteName, isAdmin, onFeature }: { post: Post; siteName: string; isAdmin: boolean; onFeature: (post:Post,mediaKey:string,slot:number)=>Promise<void> }) {
   const [index, setIndex] = useState(0);
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
   return <div className="photo">
     <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async"/>
+    {isAdmin && <label className="feature-photo-control">Feature in homepage frame
+      <select key={post.id + ':' + index} defaultValue="" aria-label="Choose homepage frame" onChange={event => {const slot=Number(event.target.value); if(event.target.value !== '') void onFeature(post,post.media[index],slot); event.target.value='';}}>
+        <option value="">Choose frame…</option>
+        <option value="0">Gallery White</option>
+        <option value="1">Carved Mahogany</option>
+        <option value="2">Black Box</option>
+      </select>
+    </label>
     {post.media.length > 1 && <>
       <span className="count">{index + 1}/{post.media.length}</span>
       <button className="prev" aria-label="Previous photo" onClick={() => setIndex((index + post.media.length - 1) % post.media.length)}><ChevronLeft size={18}/></button>
@@ -300,6 +308,20 @@ export default function Page() {
     }
   }
 
+  async function featurePhoto(post:Post, mediaKey:string, slot:number) {
+    if(!config.isAdmin || busy)return;
+    setBusy(true);
+    try {
+      const response=await fetch('/api/landing-photos',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({slot,postId:post.id,mediaKey})
+      });
+      if(!response.ok)throw Error(await response.text());
+      setStatus(`Featured photograph saved to homepage frame ${slot + 1}.`);
+    }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
+    finally{setBusy(false);}
+  }
+
   async function remove(post: Post) {
     if (!confirm(`Delete this post from ${config.siteName}? Your original photograph is unaffected.`)) return;
     try {
@@ -355,7 +377,7 @@ export default function Page() {
       <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
-    <Photo post={post} siteName={config.siteName}/>
+    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} onFeature={featurePhoto}/>
     <div className="postbody">
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
