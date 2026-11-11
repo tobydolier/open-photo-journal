@@ -132,7 +132,7 @@ function Photo({ post, siteName, isAdmin, onFeature }: { post: Post; siteName: s
         <option value="1">Carved Mahogany</option>
         <option value="2">Black Box</option>
       </select>
-    </label>
+    </label>}
     {post.media.length > 1 && <>
       <span className="count">{index + 1}/{post.media.length}</span>
       <button className="prev" aria-label="Previous photo" onClick={() => setIndex((index + post.media.length - 1) % post.media.length)}><ChevronLeft size={18}/></button>
