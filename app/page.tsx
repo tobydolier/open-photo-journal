@@ -148,6 +148,7 @@ export default function Page() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Post | null>(null);
+  const [reordering, setReordering] = useState(false);
   const folder = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -274,6 +275,31 @@ export default function Page() {
     }
   }
 
+  async function movePost(id: string, change: number) {
+    if (!config.isAdmin || search || busy) return;
+    const oldIndex = posts.findIndex(post => post.id === id);
+    const newIndex = oldIndex + change;
+    if (oldIndex < 0 || newIndex < 0 || newIndex >= posts.length) return;
+    const reordered = [...posts];
+    [reordered[oldIndex], reordered[newIndex]] = [reordered[newIndex], reordered[oldIndex]];
+    setBusy(true);
+    setPosts(reordered);
+    try {
+      const response = await fetch('/api/posts/order', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: reordered.map(post => post.id)}),
+      });
+      if (!response.ok) throw Error(await response.text() || 'Could not save order');
+      setStatus('Gallery order saved.');
+    } catch (cause) {
+      setPosts(posts);
+      setStatus(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(post: Post) {
     if (!confirm(`Delete this post from ${config.siteName}? Your original photograph is unaffected.`)) return;
     try {
@@ -334,6 +360,10 @@ export default function Page() {
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
         <a className="sharelink" href={`/p/${encodeURIComponent(post.id)}`} aria-label="Open shareable post" title="Share post"><Share2 size={18}/></a>
+        {config.isAdmin && reordering && !search && <span className="order-actions">
+          <button type="button" aria-label="Move post up" title="Move post up" disabled={busy || posts[0]?.id === post.id} onClick={() => movePost(post.id,-1)}>↑</button>
+          <button type="button" aria-label="Move post down" title="Move post down" disabled={busy || posts[posts.length-1]?.id === post.id} onClick={() => movePost(post.id,1)}>↓</button>
+        </span>}
         {config.isAdmin && <span className="onlyyou"><Lock size={12}/> Owner controls</span>}
         {config.isAdmin && <button className="delete" aria-label="Delete post" onClick={() => remove(post)}><Trash2 size={17}/></button>}
       </div>
@@ -391,7 +421,10 @@ export default function Page() {
           <button className={view === 'feed' ? 'on' : ''} onClick={() => setView('feed')}><Home size={16}/> Feed</button>
           <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}><Grid3X3 size={16}/> Grid</button>
         </div>
+        <div className="toolbar-right">
+          {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('feed');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
         <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => setSearch(event.target.value)}/></label>
+        </div>
       </div>
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
