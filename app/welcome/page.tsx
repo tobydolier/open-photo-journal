@@ -78,7 +78,7 @@ export default function WelcomePage(){
           <div className="ff-inputline"><input id="ff-email" type="email" required maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" disabled={busy||ok||!signupEnabled}/><button type="submit" disabled={!consent||busy||ok||!signupEnabled||!token}>{busy?"Sending…":ok?"Thank you!":"Register interest"} <span aria-hidden="true">↗</span></button></div>
           {signupEnabled ? <div className="ff-captcha" ref={captchaRef} aria-label="Security verification"/> : <p className="ff-unavailable">The early list is being prepared. Registration will open soon.</p>}
           <label className="ff-consent"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} disabled={busy||ok}/> I'd like to hear when FrameFeed opens. My email will only be used for launch updates.</label>
-          <p className="ff-privacy">We won't sell your email or send unrelated marketing. You can request removal at any time. <a href="mailto:privacy@framefeed.co.uk">Contact us</a>.</p>
+          <p className="ff-privacy">We won't sell your email or send unrelated marketing. You can request removal at any time. <a href="/welcome/privacy">Privacy details</a>.</p>
           <p className="ff-status" role="status" aria-live="polite">{status}</p>
         </form>
       </section>
