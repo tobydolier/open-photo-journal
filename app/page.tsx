@@ -177,12 +177,10 @@ function mutedDominantColour(image: HTMLImageElement) {
 
     let hue = 0;
     if (dominant.delta) {
-      const minimum = Math.min(dominant.red, dominant.green, dominant.blue);
       if (dominant.maximum === dominant.red) hue = ((dominant.green - dominant.blue) / dominant.delta) % 6;
       else if (dominant.maximum === dominant.green) hue = (dominant.blue - dominant.red) / dominant.delta + 2;
       else hue = (dominant.red - dominant.green) / dominant.delta + 4;
       hue = (hue * 60 + 360) % 360;
-      void minimum;
     }
     const mutedSaturation = colourful.length
       ? Math.round(Math.min(36, Math.max(18, dominant.saturation * 55)))
@@ -213,7 +211,8 @@ function Photo({
   useEffect(() => setMountColour(''), [src]);
   const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
   const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
-  return <div className="photo-block">\n    <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
+  return <div className="photo-block">
+    <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
       <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
