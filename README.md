@@ -47,6 +47,10 @@ file. Public presentation is controlled by environment variables:
 | `VISIBILITY_LABEL` | Profile status text |
 | `STORAGE_LIMIT_BYTES` | Application-level upload safety ceiling |
 | `PUBLIC_SITE_URL` | Canonical production origin used by share cards |
+| `WORDMARK_IMAGE_URL` | Optional root-relative or HTTPS wordmark/logo image |
+| `PROFILE_IMAGE_URL` | Optional root-relative or HTTPS profile photograph |
+| `FAVICON_URL` | Optional root-relative or HTTPS browser icon |
+| `SHARE_IMAGE_URL` | Optional HTTPS default social-sharing image |
 
 Choose one administrator method:
 
