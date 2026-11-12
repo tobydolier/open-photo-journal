@@ -38,9 +38,10 @@ type FeaturedPhoto = { slot: number; postId: string; key: string; src: string; c
 type FrameStyle = '' | 'white' | 'mahogany' | 'black';
 type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''> };
 
-type ArchivePost = { caption: string; date: string; paths: string[] };
+type ArchivePost = { id?: string; caption: string; date: string; paths: string[] };
 type JsonMedia = { uri?: string; title?: string; creation_timestamp?: number };
 type JsonPost = { media?: JsonMedia[]; title?: string; creation_timestamp?: number };
+type FrameFeedPost = { id?: string; caption?: string; date?: string; media?: string[] };
 
 const defaultConfig: PublicSiteConfig = {
   siteName: 'Open Photo Journal',
@@ -358,7 +359,18 @@ export default function Page() {
       const rows: ArchivePost[] = [];
       for (const file of htmls) rows.push(...parseHtmlPosts(await file.text()));
       for (const file of jsons) {
-        const data = JSON.parse(await file.text()) as JsonPost[] | { ig_posts?: JsonPost[] };
+        const data = JSON.parse(await file.text()) as JsonPost[] | { ig_posts?: JsonPost[]; framefeed_posts?: FrameFeedPost[] };
+        if (!Array.isArray(data) && Array.isArray(data.framefeed_posts)) {
+          for (const row of data.framefeed_posts) {
+            const paths = (row.media || []).map(cleanPath);
+            if (!row.id || !row.date || !paths.length) {
+              skipped++;
+              continue;
+            }
+            rows.push({ id: row.id, caption: row.caption || '', date: row.date, paths });
+          }
+          continue;
+        }
         const items = Array.isArray(data) ? data : data.ig_posts || [];
         for (const row of items) {
           const media = row.media || [];
@@ -384,7 +396,7 @@ export default function Page() {
           skipped++;
           continue;
         }
-        const id = await archiveId(row.paths);
+        const id = row.id || await archiveId(row.paths);
         if (existingIds.has(id)) {
           duplicates++;
           continue;
