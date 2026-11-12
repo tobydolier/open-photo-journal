@@ -30,3 +30,64 @@
 .photo-framed{height:auto;min-height:0;overflow:visible;isolation:isolate}
 .photo-framed .photo-open{height:auto;max-height:none;overflow:visible}
 .photo-framed .photo-open img{height:auto}
+
+
+/* A deeper, carved mahogany treatment: irregular grain, layered moulding,
+   gilt sight edge and restrained corner ornament. */
+.photo-frame-mahogany,
+.lightbox-frame-mahogany{
+  position:relative;
+  isolation:isolate;
+  padding:22px;
+  border:3px solid #2b1008;
+  background:
+    radial-gradient(circle at 10px 10px,#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
+    radial-gradient(circle at calc(100% - 10px) 10px,#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
+    radial-gradient(circle at 10px calc(100% - 10px),#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 10px),#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
+    repeating-linear-gradient(92deg,transparent 0 7px,#f1bd7314 8px,#21090530 10px,transparent 13px),
+    repeating-linear-gradient(7deg,#6f321f 0,#4c1d11 4px,#8e4b2e 8px,#351109 12px,#71331f 17px);
+  box-shadow:
+    0 8px 18px #2a130b40,
+    inset 0 0 0 2px #d2a15c,
+    inset 0 0 0 6px #3a160c,
+    inset 0 0 0 9px #ad7139;
+}
+.photo-frame-mahogany::before,
+.lightbox-frame-mahogany::before{
+  content:"";
+  position:absolute;
+  inset:7px;
+  z-index:1;
+  pointer-events:none;
+  border:3px double #d5a65f;
+  box-shadow:0 0 0 2px #38140b,inset 0 0 0 2px #4c2113;
+}
+.photo-frame-mahogany::after,
+.lightbox-frame-mahogany::after{
+  content:"";
+  position:absolute;
+  inset:13px;
+  z-index:1;
+  pointer-events:none;
+  border:2px groove #a36c39;
+  box-shadow:inset 0 0 5px #1c0806b8,0 0 3px #e2bb7966;
+}
+.photo-frame-mahogany .photo-open,
+.lightbox-frame-mahogany .lightbox-mount{
+  position:relative;
+  z-index:2;
+  border:5px double #cda363;
+  box-shadow:0 0 0 2px #3a160d,inset 0 0 0 1px #f0d69a;
+  background:var(--mahogany-mount,#f5ead8);
+  transition:background-color .35s ease;
+}
+@media(min-width:1100px){
+  .photo-frame-mahogany{--frame-outset:58px}
+}
+@media(max-width:760px){
+  .photo-frame-mahogany,.lightbox-frame-mahogany{padding:11px;border-width:2px}
+  .photo-frame-mahogany::before,.lightbox-frame-mahogany::before{inset:3px;border-width:2px}
+  .photo-frame-mahogany::after,.lightbox-frame-mahogany::after{inset:7px;border-width:1px}
+  .photo-frame-mahogany .photo-open,.lightbox-frame-mahogany .lightbox-mount{border-width:3px}
+}
