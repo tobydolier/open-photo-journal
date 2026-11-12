@@ -65,12 +65,20 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
   return <div className="sharepage">
     <main>
       <div className="sharetop">
-        <Link className="wordmark" href="/">{config.siteName}<span>•</span></Link>
+        <Link className="wordmark" href="/">
+          {config.wordmarkImageUrl
+            ? <img className="wordmark-image" src={config.wordmarkImageUrl} alt={config.siteName}/>
+            : <>{config.siteName}<span>•</span></>}
+        </Link>
         <Link className="backlink" href="/">← Back to all posts</Link>
       </div>
       <article className="sharecard">
         <div className="sharecardhead">
-          <div className="avatar small">{config.profileInitial}</div>
+          <div className="avatar small">
+            {config.profileImageUrl
+              ? <img src={config.profileImageUrl} alt="" aria-hidden="true"/>
+              : config.profileInitial}
+          </div>
           <div><b>{config.profileHandle}</b><small>{date}</small></div>
           {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
         </div>
