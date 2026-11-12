@@ -291,6 +291,7 @@ export default function Page() {
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
   const folder = useRef<HTMLInputElement>(null);
+  const archiveFiles = useRef<HTMLInputElement>(null);
 
   async function load() {
     const [postsResponse, configResponse, framesResponse] = await Promise.all([
@@ -404,6 +405,7 @@ export default function Page() {
     } finally {
       setBusy(false);
       if (folder.current) folder.current.value = '';
+      if (archiveFiles.current) archiveFiles.current.value = '';
     }
   }
 
@@ -700,6 +702,8 @@ export default function Page() {
                 <div className="importnote">HTML and JSON exports are supported, including photo carousels. Videos, Stories, missing files and unsupported formats are skipped. Existing imports are detected so you can safely resume.</div>
                 <input type="file" ref={folder} style={{ display: 'none' }} {...({ webkitdirectory: '', directory: '' } as object)} multiple onChange={event => importArchive(event.target.files)}/>
                 <button className="primary wide" disabled={busy} onClick={() => folder.current?.click()}><Download size={17}/>{busy ? 'Importing…' : 'Select extracted Instagram folder'}</button>
+                <input type="file" ref={archiveFiles} style={{ display: 'none' }} multiple accept=".html,.json,.jpg,.jpeg,.png,.webp" onChange={event => importArchive(event.target.files)}/>
+                <button className="wide" disabled={busy} onClick={() => archiveFiles.current?.click()}>{busy ? 'Importing…' : 'Or select archive files'}</button>
                 <small>The archive is processed in the browser; only compressed photographs and post details are uploaded.</small>
               </>
               : <>
@@ -714,3 +718,4 @@ export default function Page() {
     </div>}
   </>;
 }
+
