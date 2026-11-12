@@ -21,3 +21,12 @@
   .photo-frame-black{--frame-outset:46px}
   .photo-frame-mahogany{--frame-outset:57px}
 }
+
+
+/* Keep the complete outer frame in normal document flow. The framed photo is
+   taller than its unframed parent, so neither the card nor the photo may clip
+   its lower edge. */
+.feed article:has(.photo-framed){overflow:visible}
+.photo-framed{height:auto;min-height:0;overflow:visible;isolation:isolate}
+.photo-framed .photo-open{height:auto;max-height:none;overflow:visible}
+.photo-framed .photo-open img{height:auto}
