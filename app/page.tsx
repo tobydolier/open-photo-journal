@@ -207,14 +207,19 @@ function Photo({
   const [savingFrame, setSavingFrame] = useState(false);
   const [frameError, setFrameError] = useState(false);
   const [mountColour, setMountColour] = useState('');
+  const imageElement = useRef<HTMLImageElement>(null);
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
-  useEffect(() => setMountColour(''), [src]);
+  useEffect(() => {
+    setMountColour('');
+    const image = imageElement.current;
+    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image));
+  }, [src]);
   const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
   const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
     <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
-      <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
+      <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
     </button>
     {post.media.length > 1 && <>
