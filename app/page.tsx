@@ -12,6 +12,7 @@ import {
   Heart,
   Home,
   ImagePlus,
+  Images,
   Lock,
   LogIn,
   LogOut,
@@ -36,7 +37,7 @@ type Post = {
 };
 
 type FeaturedPhoto = { slot: number; postId: string; key: string; src: string; caption: string };
-type FrameStyle = '' | 'white' | 'mahogany' | 'black';
+type FrameStyle = '' | 'white' | 'mahogany' | 'black' | 'pine';
 type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''> };
 
 type ArchivePost = { id?: string; caption: string; date: string; paths: string[] };
@@ -224,15 +225,17 @@ function mutedDominantColour(image: HTMLImageElement) {
 }
 
 function Photo({
-  post, siteName, isAdmin, photoFrames, onOpen, onFrame, onFeature,
+  post, siteName, isAdmin, photoFrames, galleryPhotos, onOpen, onFrame, onGallery, onRemoveFromGallery,
 }: {
   post: Post;
   siteName: string;
   isAdmin: boolean;
   photoFrames: PhotoFrame[];
+  galleryPhotos: Array<FeaturedPhoto | null>;
   onOpen: (post: Post, mediaIndex: number) => void;
   onFrame: (post: Post, mediaKey: string, style: FrameStyle) => Promise<boolean>;
-  onFeature: (post: Post, mediaKey: string, slot: number) => Promise<void>;
+  onGallery: (post: Post, mediaKey: string, slot: number) => Promise<void>;
+  onRemoveFromGallery: (slot: number) => Promise<void>;
 }) {
   const [index, setIndex] = useState(0);
   const [savingFrame, setSavingFrame] = useState(false);
@@ -246,6 +249,7 @@ function Photo({
     if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image));
   }, [src]);
   const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
+  const gallerySlot = galleryPhotos.findIndex(photo => photo?.postId === post.id && photo.key === post.media[index]);
   const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
     <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
@@ -274,18 +278,17 @@ function Photo({
           <option value="white">Gallery white</option>
           <option value="mahogany">Carved mahogany</option>
           <option value="black">Black box</option>
+          <option value="pine">Natural pine</option>
         </select>
       </label>
-      <label className="feature-photo-control landing-feature-control">Feature on landing
-        <select key={`landing:${post.id}:${index}`} defaultValue="" aria-label="Choose landing-page frame" onChange={event => {
-          const slot=Number(event.target.value);
-          if(event.target.value !== '') void onFeature(post,post.media[index],slot);
-          event.target.value='';
+      <label className="feature-photo-control landing-feature-control">Gallery placement
+        <select key={`gallery:${post.id}:${index}:${gallerySlot}`} value={gallerySlot < 0 ? '' : String(gallerySlot)} aria-label="Choose gallery position" onChange={event => {
+          if(event.target.value === 'remove') void onRemoveFromGallery(gallerySlot);
+          else if(event.target.value !== '') void onGallery(post,post.media[index],Number(event.target.value));
         }}>
-          <option value="">Choose slot…</option>
-          <option value="0">Gallery white</option>
-          <option value="1">Carved mahogany</option>
-          <option value="2">Black box</option>
+          <option value="">Not in gallery</option>
+          {Array.from({length:9},(_,slot)=><option key={slot} value={slot}>Position {slot + 1}</option>)}
+          {gallerySlot >= 0 && <option value="remove">Remove from gallery</option>}
         </select>
       </label>
     </div>}
@@ -306,6 +309,7 @@ export default function Page() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [photoFrames, setPhotoFrames] = useState<PhotoFrame[]>([]);
+  const [galleryPhotos, setGalleryPhotos] = useState<Array<FeaturedPhoto | null>>(() => Array(9).fill(null));
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
@@ -315,10 +319,11 @@ export default function Page() {
   const archiveFiles = useRef<HTMLInputElement>(null);
 
   async function load() {
-    const [postsResponse, configResponse, framesResponse] = await Promise.all([
+    const [postsResponse, configResponse, framesResponse, galleryResponse] = await Promise.all([
       fetch('/api/posts'),
       fetch('/api/config', { cache: 'no-store' }),
       fetch('/api/photo-frames', { cache: 'no-store' }),
+      fetch('/api/landing-photos', { cache: 'no-store' }),
     ]);
     if (!postsResponse.ok) throw Error('Could not load the photos. Please refresh.');
     if (!configResponse.ok) throw Error('Could not load the journal settings. Please refresh.');
@@ -327,6 +332,10 @@ export default function Page() {
     if (framesResponse.ok) {
       const data = await framesResponse.json() as { frames?: PhotoFrame[] };
       setPhotoFrames(data.frames || []);
+    }
+    if (galleryResponse.ok) {
+      const data = await galleryResponse.json() as { photos?: Array<FeaturedPhoto | null> };
+      setGalleryPhotos(Array.from({length:9},(_,slot)=>data.photos?.[slot] || null));
     }
   }
 
@@ -537,7 +546,7 @@ export default function Page() {
       });
       if (!response.ok) throw Error(await response.text() || 'Could not save frame');
       await load();
-      const frameName = style ? ({ white: 'Gallery white', mahogany: 'Carved mahogany', black: 'Black box' } as const)[style] : 'No frame';
+      const frameName = style ? ({ white: 'Gallery white', mahogany: 'Carved mahogany', black: 'Black box', pine: 'Natural pine' } as const)[style] : 'No frame';
       setStatus(`${frameName} saved for this photograph.`);
       return true;
     } catch (cause) {
@@ -546,7 +555,7 @@ export default function Page() {
     }
   }
 
-  async function featurePhoto(post:Post, mediaKey:string, slot:number) {
+  async function placeInGallery(post:Post, mediaKey:string, slot:number) {
     if(!config.isAdmin || busy)return;
     setBusy(true);
     try {
@@ -555,7 +564,20 @@ export default function Page() {
         body:JSON.stringify({slot,postId:post.id,mediaKey})
       });
       if(!response.ok)throw Error(await response.text());
-      setStatus(`Featured photograph saved to homepage frame ${slot + 1}.`);
+      await load();
+      setStatus(`Photograph placed in gallery position ${slot + 1}.`);
+    }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
+    finally{setBusy(false);}
+  }
+
+  async function removeFromGallery(slot:number) {
+    if(!config.isAdmin || busy || slot < 0)return;
+    setBusy(true);
+    try {
+      const response=await fetch(`/api/landing-photos?slot=${slot}`,{method:'DELETE'});
+      if(!response.ok)throw Error(await response.text());
+      await load();
+      setStatus('Photograph removed from the gallery.');
     }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
     finally{setBusy(false);}
   }
@@ -619,6 +641,15 @@ export default function Page() {
     : '';
   useEffect(() => setViewerMountColour(''), [viewer?.key]);
   const viewerMountStyle = viewerMountColour ? ({ '--mahogany-mount': viewerMountColour } as CSSProperties) : undefined;
+  const galleryItems = galleryPhotos.flatMap((photo, slot) => {
+    if (!photo) return [];
+    const post = posts.find(item => item.id === photo.postId);
+    if (!post) return [];
+    const mediaIndex = post.media.indexOf(photo.key);
+    if (mediaIndex < 0) return [];
+    const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === photo.postId && frame.key === photo.key)?.style || '';
+    return [{ photo, post, mediaIndex, frameStyle, slot }];
+  });
 
 
   const postCard = (post: Post) => <article key={post.id}>
@@ -627,7 +658,7 @@ export default function Page() {
       <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
-    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} onOpen={openPhoto} onFrame={setPhotoFrame} onFeature={featurePhoto}/>
+    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} galleryPhotos={galleryPhotos} onOpen={openPhoto} onFrame={setPhotoFrame} onGallery={placeInGallery} onRemoveFromGallery={removeFromGallery}/>
     <div className="postbody">
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
@@ -654,6 +685,7 @@ export default function Page() {
       <nav>
         <button className={view === 'feed' ? 'chosen' : ''} onClick={() => { setView('feed'); setViewerIndex(null); }}><Home size={23}/>Home</button>
         <button className={view === 'grid' ? 'chosen' : ''} onClick={() => { setView('grid'); setViewerIndex(null); }}><Grid3X3 size={23}/>Photos</button>
+        <button className={view === 'gallery' ? 'chosen' : ''} onClick={() => { setView('gallery'); setViewerIndex(null); }}><Images size={23}/>Gallery</button>
         {config.isAdmin && <button className={view === 'saved' ? 'chosen' : ''} onClick={() => { setView('saved'); setViewerIndex(null); }}><Heart size={23}/>Favourites</button>}
         {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare size={23}/>Create</button>}
         {config.isAdmin && <button onClick={() => setModal('import')}><Download size={23}/>Import Instagram</button>}
@@ -678,7 +710,7 @@ export default function Page() {
 
     <main>
       <header>
-        <div><span className="eyebrow">{config.eyebrow}</span><h1>{view === 'grid' ? 'Photos' : view === 'saved' ? 'Favourites' : 'Moments, all together.'}</h1></div>
+        <div><span className="eyebrow">{config.eyebrow}</span><h1>{view === 'grid' ? 'Photos' : view === 'gallery' ? 'The gallery' : view === 'saved' ? 'Favourites' : 'Moments, all together.'}</h1></div>
         {config.isAdmin && <button className="primary" onClick={() => setModal('create')}><PlusSquare size={17}/> New post</button>}
       </header>
       <div className="profile">
@@ -697,6 +729,7 @@ export default function Page() {
         <div>
           <button className={view === 'feed' ? 'on' : ''} onClick={() => setView('feed')}><Home size={16}/> Feed</button>
           <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}><Grid3X3 size={16}/> Grid</button>
+          <button className={view === 'gallery' ? 'on' : ''} onClick={() => setView('gallery')}><Images size={16}/> Gallery</button>
         </div>
         <div className="toolbar-right">
           {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('feed');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
@@ -705,7 +738,18 @@ export default function Page() {
       </div>
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
-      <section className={view === 'grid' ? 'grid' : 'feed'}>
+      {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
+        <div className="gallery-wall">
+          {galleryItems.length ? galleryItems.map(({photo,post,mediaIndex,frameStyle,slot}) =>
+            <button key={slot} className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => openPhoto(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
+              <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'}`}>
+                <span className="gallery-mount"><img src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async"/></span>
+              </span>
+              <small>{photo.caption || 'Untitled'}</small>
+            </button>)
+          : <div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Choose up to nine photographs using the Gallery placement control beneath any post.' : 'No photographs have been hung here yet.'}</p></div>}
+        </div>
+      </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
         {visible.length
           ? view === 'grid'
             ? visible.map(post => <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
@@ -725,7 +769,7 @@ export default function Page() {
             </>}
             <div className="emptyfoot"><Lock size={12}/> No algorithm. Just photographs.</div>
           </div>}
-      </section>
+      </section>}
       <footer>
         {config.siteName}
         <span>
@@ -738,6 +782,7 @@ export default function Page() {
     <div className="mobilebar">
       <button onClick={() => setView('feed')}><Home/></button>
       <button onClick={() => setView('grid')}><Grid3X3/></button>
+      <button onClick={() => setView('gallery')}><Images/></button>
       {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare/></button>}
       {config.isAdmin && <button onClick={() => setModal('import')}><Download/></button>}
       {config.isAdmin && <button onClick={openProfileSettings}><Settings/></button>}

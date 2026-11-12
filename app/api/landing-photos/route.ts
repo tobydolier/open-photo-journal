@@ -8,13 +8,13 @@ const headers={"Cache-Control":"no-store"};
 
 export async function GET() {
   const db=env.DB;
-  if(!db)return Response.json({photos:[null,null,null]},{headers});
+  if(!db)return Response.json({photos:Array(9).fill(null)},{headers});
   try {
     const {results}=await db.prepare(`SELECT f.slot,f.post_id,f.media_key,p.caption,p.media
       FROM featured_photos f JOIN posts p ON p.id=f.post_id ORDER BY f.slot`).all<Row>();
-    const photos:(null|{slot:number;postId:string;key:string;src:string;caption:string})[]=[null,null,null];
+    const photos:(null|{slot:number;postId:string;key:string;src:string;caption:string})[]=Array(9).fill(null);
     for(const row of results){
-      if(!Number.isInteger(row.slot)||row.slot<0||row.slot>2||!keyPattern.test(row.media_key))continue;
+      if(!Number.isInteger(row.slot)||row.slot<0||row.slot>8||!keyPattern.test(row.media_key))continue;
       try {
         const media=JSON.parse(row.media);
         if(!Array.isArray(media)||!media.includes(row.media_key))continue;
@@ -25,7 +25,7 @@ export async function GET() {
     return Response.json({photos},{headers});
   } catch {
     // Migration not yet applied: landing stays on placeholders.
-    return Response.json({photos:[null,null,null]},{headers});
+    return Response.json({photos:Array(9).fill(null)},{headers});
   }
 }
 
@@ -37,7 +37,7 @@ export async function PUT(request:Request) {
   try {body=await request.json();}catch{return error("Invalid request",400);}
   if(!body||typeof body!=="object")return error("Invalid selection",400);
   const {slot,postId,mediaKey} = body as {slot:unknown;postId:unknown;mediaKey:unknown};
-  if(!Number.isInteger(slot)||(slot as number)<0||(slot as number)>2)return error("Invalid featured slot",400);
+  if(!Number.isInteger(slot)||(slot as number)<0||(slot as number)>8)return error("Invalid gallery position",400);
   if(typeof postId!=="string"||!keyPattern.test(postId))return error("Invalid post",400);
   if(typeof mediaKey!=="string"||!keyPattern.test(mediaKey))return error("Invalid photo",400);
   const db=env.DB;
@@ -51,7 +51,7 @@ export async function PUT(request:Request) {
       ON CONFLICT(slot) DO UPDATE SET post_id=excluded.post_id, media_key=excluded.media_key`)
       .bind(slot,postId,mediaKey).run();
     return Response.json({ok:true},{headers});
-  }catch{return error("Couldn't save selection. Check the featured-photos migration.",503);}
+  }catch{return error("Couldn't save the gallery selection. Check the featured-photos migration.",503);}
 }
 
 export async function DELETE(request:Request) {
@@ -59,9 +59,9 @@ export async function DELETE(request:Request) {
   if(request.headers.get("origin")!==new URL(request.url).origin)return error("Forbidden",403);
   const url=new URL(request.url);
   const slot=Number(url.searchParams.get("slot"));
-  if(!Number.isInteger(slot)||slot<0||slot>2)return error("Invalid slot",400);
+  if(!Number.isInteger(slot)||slot<0||slot>8)return error("Invalid gallery position",400);
   try{
     await env.DB!.prepare("DELETE FROM featured_photos WHERE slot=?").bind(slot).run();
     return Response.json({ok:true},{headers});
-  }catch{return error("Couldn't remove featured photo",503);}
+  }catch{return error("Couldn't remove gallery photo",503);}
 }

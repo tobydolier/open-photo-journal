@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 import { isAdminRequest } from "../../../lib/admin-auth";
 
-type FrameStyle = "white" | "mahogany" | "black";
+type FrameStyle = "white" | "mahogany" | "black" | "pine";
 type Row = { post_id: string; media_key: string; style: string; media: string };
 const keyPattern = /^[a-zA-Z0-9_-]{1,120}$/;
-const allowedStyles = new Set<FrameStyle>(["white", "mahogany", "black"]);
+const allowedStyles = new Set<FrameStyle>(["white", "mahogany", "black", "pine"]);
 const headers = { "Cache-Control": "private, no-store" };
 const error = (message: string, status: number) => Response.json({ message }, { status, headers });
 
