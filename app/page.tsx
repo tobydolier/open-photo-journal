@@ -128,7 +128,7 @@ async function compress(file: File) {
 
 function mutedDominantColour(image: HTMLImageElement) {
   try {
-    const size = 32;
+    const size = 40;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -157,25 +157,37 @@ function mutedDominantColour(image: HTMLImageElement) {
       buckets.set(key, bucket);
     }
 
-    const dominant = Array.from(buckets.values()).sort((left, right) => right.count - left.count)[0];
+    const candidates = Array.from(buckets.values()).map(bucket => {
+      const red = bucket.red / bucket.count / 255;
+      const green = bucket.green / bucket.count / 255;
+      const blue = bucket.blue / bucket.count / 255;
+      const maximum = Math.max(red, green, blue);
+      const minimum = Math.min(red, green, blue);
+      const delta = maximum - minimum;
+      const lightness = (maximum + minimum) / 2;
+      const saturation = delta ? delta / (1 - Math.abs(2 * lightness - 1)) : 0;
+      return { ...bucket, red, green, blue, maximum, delta, lightness, saturation };
+    });
+    const colourful = candidates.filter(colour => colour.saturation >= 0.12 && colour.lightness >= 0.12 && colour.lightness <= 0.9);
+    const pool = colourful.length ? colourful : candidates;
+    const dominant = pool.sort((left, right) => (
+      right.count * (0.7 + right.saturation) - left.count * (0.7 + left.saturation)
+    ))[0];
     if (!dominant) return '';
-    const red = dominant.red / dominant.count / 255;
-    const green = dominant.green / dominant.count / 255;
-    const blue = dominant.blue / dominant.count / 255;
-    const maximum = Math.max(red, green, blue);
-    const minimum = Math.min(red, green, blue);
-    const delta = maximum - minimum;
-    const lightness = (maximum + minimum) / 2;
+
     let hue = 0;
-    if (delta) {
-      if (maximum === red) hue = ((green - blue) / delta) % 6;
-      else if (maximum === green) hue = (blue - red) / delta + 2;
-      else hue = (red - green) / delta + 4;
+    if (dominant.delta) {
+      const minimum = Math.min(dominant.red, dominant.green, dominant.blue);
+      if (dominant.maximum === dominant.red) hue = ((dominant.green - dominant.blue) / dominant.delta) % 6;
+      else if (dominant.maximum === dominant.green) hue = (dominant.blue - dominant.red) / dominant.delta + 2;
+      else hue = (dominant.red - dominant.green) / dominant.delta + 4;
       hue = (hue * 60 + 360) % 360;
+      void minimum;
     }
-    const saturation = delta ? delta / (1 - Math.abs(2 * lightness - 1)) : 0;
-    const mutedSaturation = Math.round(Math.min(28, saturation * 38));
-    const mountLightness = Math.round(Math.min(86, Math.max(68, lightness * 100 + 28)));
+    const mutedSaturation = colourful.length
+      ? Math.round(Math.min(36, Math.max(18, dominant.saturation * 55)))
+      : 0;
+    const mountLightness = Math.round(Math.min(84, Math.max(70, dominant.lightness * 100 + 25)));
     return `hsl(${Math.round(hue)} ${mutedSaturation}% ${mountLightness}%)`;
   } catch {
     return '';
@@ -201,11 +213,18 @@ function Photo({
   useEffect(() => setMountColour(''), [src]);
   const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
   const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
-  return <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
+  return <div className="photo-block">\n    <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
       <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
     </button>
+    {post.media.length > 1 && <>
+      <span className="count">{index + 1}/{post.media.length}</span>
+      <button className="prev" aria-label="Previous photo" onClick={() => setIndex((index + post.media.length - 1) % post.media.length)}><ChevronLeft size={18}/></button>
+      <button className="next" aria-label="Next photo" onClick={() => setIndex((index + 1) % post.media.length)}><ChevronRight size={18}/></button>
+      <div className="dots">{post.media.map((_, item) => <i key={item} className={item === index ? 'active' : ''}/>)}</div>
+    </>}
+    </div>
     {isAdmin && <div className="photo-owner-controls">
       <label className={`feature-photo-control ${frameError ? 'frame-save-error' : ''}`}>
         <span aria-live="polite">{savingFrame ? 'Saving…' : frameError ? 'Couldn’t save' : 'Frame style'}</span>
@@ -235,12 +254,6 @@ function Photo({
         </select>
       </label>
     </div>}
-    {post.media.length > 1 && <>
-      <span className="count">{index + 1}/{post.media.length}</span>
-      <button className="prev" aria-label="Previous photo" onClick={() => setIndex((index + post.media.length - 1) % post.media.length)}><ChevronLeft size={18}/></button>
-      <button className="next" aria-label="Next photo" onClick={() => setIndex((index + 1) % post.media.length)}><ChevronRight size={18}/></button>
-      <div className="dots">{post.media.map((_, item) => <i key={item} className={item === index ? 'active' : ''}/>)}</div>
-    </>}
   </div>;
 }
 
