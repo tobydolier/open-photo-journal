@@ -18,6 +18,7 @@ import {
   Maximize2,
   PlusSquare,
   Search,
+  Settings,
   Share2,
   Trash2,
   X,
@@ -61,6 +62,23 @@ const defaultConfig: PublicSiteConfig = {
   isAdmin: false,
   passwordLoginEnabled: false,
 };
+
+type EditableProfile = Pick<PublicSiteConfig,
+  'siteName' | 'siteDescription' | 'profileName' | 'profileHandle' |
+  'profileBio' | 'eyebrow' | 'visibilityLabel'
+>;
+
+function editableProfile(config: PublicSiteConfig): EditableProfile {
+  return {
+    siteName: config.siteName,
+    siteDescription: config.siteDescription,
+    profileName: config.profileName,
+    profileHandle: config.profileHandle,
+    profileBio: config.profileBio,
+    eyebrow: config.eyebrow,
+    visibilityLabel: config.visibilityLabel,
+  };
+}
 
 const imageFile = /\.(?:jpe?g|png|webp)$/i;
 
@@ -291,6 +309,8 @@ export default function Page() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<EditableProfile>(() => editableProfile(defaultConfig));
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const folder = useRef<HTMLInputElement>(null);
   const archiveFiles = useRef<HTMLInputElement>(null);
 
@@ -418,6 +438,54 @@ export default function Page() {
       setBusy(false);
       if (folder.current) folder.current.value = '';
       if (archiveFiles.current) archiveFiles.current.value = '';
+    }
+  }
+
+  function openProfileSettings() {
+    setProfileDraft(editableProfile(config));
+    setProfilePhoto(null);
+    setStatus('');
+    setModal('settings');
+  }
+
+  async function saveProfileSettings() {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileDraft),
+      });
+      if (!response.ok) throw Error(await response.text() || 'Could not save profile settings');
+      if (profilePhoto) {
+        const form = new FormData();
+        form.set('photo', await compress(profilePhoto), 'profile.webp');
+        const photoResponse = await fetch('/api/settings', { method: 'POST', body: form });
+        if (!photoResponse.ok) throw Error(await photoResponse.text() || 'Could not save profile photo');
+      }
+      await load();
+      setModal('');
+      setProfilePhoto(null);
+      setStatus('Profile settings saved.');
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearProfilePhoto() {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/settings', { method: 'DELETE' });
+      if (!response.ok) throw Error(await response.text() || 'Could not remove profile photo');
+      setProfilePhoto(null);
+      await load();
+      setStatus('Profile photo removed.');
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -589,6 +657,7 @@ export default function Page() {
         {config.isAdmin && <button className={view === 'saved' ? 'chosen' : ''} onClick={() => { setView('saved'); setViewerIndex(null); }}><Heart size={23}/>Favourites</button>}
         {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare size={23}/>Create</button>}
         {config.isAdmin && <button onClick={() => setModal('import')}><Download size={23}/>Import Instagram</button>}
+        {config.isAdmin && <button onClick={openProfileSettings}><Settings size={23}/>Profile settings</button>}
       </nav>
       <div className="asidebottom">
         <div className="privacy"><Lock size={15}/><div><b>{config.visibilityLabel}</b><small>{config.siteDescription}</small></div></div>
@@ -671,6 +740,7 @@ export default function Page() {
       <button onClick={() => setView('grid')}><Grid3X3/></button>
       {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare/></button>}
       {config.isAdmin && <button onClick={() => setModal('import')}><Download/></button>}
+      {config.isAdmin && <button onClick={openProfileSettings}><Settings/></button>}
       {config.isAdmin
         ? <button onClick={() => setView('saved')}><Heart/></button>
         : config.passwordLoginEnabled && <button onClick={() => setModal('login')}><LogIn/></button>}
@@ -718,7 +788,29 @@ export default function Page() {
                 <button className="wide" disabled={busy} onClick={() => archiveFiles.current?.click()}>{busy ? 'Importing…' : 'Or select archive files'}</button>
                 <small>The archive is processed in the browser; only compressed photographs and post details are uploaded.</small>
               </>
-              : <>
+              : modal === 'settings'
+                ? <>
+                  <span className="eyebrow">MAKE IT YOURS</span>
+                  <h2>Profile settings</h2>
+                  <p>Update the identity and introductory copy shown throughout your journal.</p>
+                  <label className="drop">
+                    <ProfileAvatar config={config} size="large"/>
+                    <b>{profilePhoto ? profilePhoto.name : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
+                    <small>JPEG, PNG or WebP · a square image works best</small>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => setProfilePhoto(event.target.files?.[0] || null)}/>
+                  </label>
+                  {config.profileImageUrl && <button className="wide" disabled={busy} onClick={clearProfilePhoto}>Remove current profile photo</button>}
+                  <label className="field">Display name<input value={profileDraft.profileName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, profileName: event.target.value})}/></label>
+                  <label className="field">Username<input value={profileDraft.profileHandle} maxLength={40} onChange={event => setProfileDraft({...profileDraft, profileHandle: event.target.value.replace(/^@+/, '')})}/></label>
+                  <label className="field">Bio<textarea value={profileDraft.profileBio} maxLength={240} onChange={event => setProfileDraft({...profileDraft, profileBio: event.target.value})}/></label>
+                  <label className="field">Journal name<input value={profileDraft.siteName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, siteName: event.target.value})}/></label>
+                  <label className="field">Header label<input value={profileDraft.eyebrow} maxLength={80} onChange={event => setProfileDraft({...profileDraft, eyebrow: event.target.value})}/></label>
+                  <label className="field">Privacy label<input value={profileDraft.visibilityLabel} maxLength={40} onChange={event => setProfileDraft({...profileDraft, visibilityLabel: event.target.value})}/></label>
+                  <label className="field">Journal description<textarea value={profileDraft.siteDescription} maxLength={180} onChange={event => setProfileDraft({...profileDraft, siteDescription: event.target.value})}/></label>
+                  <small>These changes appear immediately throughout the journal. The original open-source defaults remain available as deployment settings.</small>
+                  <button className="primary wide" disabled={busy || !profileDraft.profileName.trim() || !profileDraft.profileHandle.trim() || !profileDraft.siteName.trim()} onClick={saveProfileSettings}>{busy ? 'Saving…' : 'Save profile settings'}</button>
+                </>
+                : <>
                 <span className="eyebrow">OWNER ACCESS</span>
                 <h2>Manage this journal</h2>
                 <p>Enter the administrator password configured by this journal’s owner.</p>
