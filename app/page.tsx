@@ -53,6 +53,10 @@ const defaultConfig: PublicSiteConfig = {
   visibilityLabel: 'Photo journal',
   locale: 'en-GB',
   storageLimitBytes: 8_000_000_000,
+  wordmarkImageUrl: '',
+  profileImageUrl: '',
+  faviconUrl: '',
+  shareImageUrl: '',
   isAdmin: false,
   passwordLoginEnabled: false,
 };
@@ -124,6 +128,14 @@ async function compress(file: File) {
       0.84,
     );
   });
+}
+
+function ProfileAvatar({ config, size = '' }: { config: PublicSiteConfig; size?: 'small' | 'large' | '' }) {
+  return <div className={`avatar ${size}`.trim()}>
+    {config.profileImageUrl
+      ? <img src={config.profileImageUrl} alt="" aria-hidden="true"/>
+      : config.profileInitial}
+  </div>;
 }
 
 function mutedDominantColour(image: HTMLImageElement) {
@@ -529,7 +541,7 @@ export default function Page() {
 
   const postCard = (post: Post) => <article key={post.id}>
     <div className="posthead">
-      <div className="avatar small">{config.profileInitial}</div>
+      <ProfileAvatar config={config} size="small"/>
       <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
@@ -552,7 +564,11 @@ export default function Page() {
 
   return <>
     <aside>
-      <a className="wordmark" href="/">{config.siteName}<span>•</span></a>
+      <a className="wordmark" href="/">
+        {config.wordmarkImageUrl
+          ? <img className="wordmark-image" src={config.wordmarkImageUrl} alt={config.siteName}/>
+          : <>{config.siteName}<span>•</span></>}
+      </a>
       <nav>
         <button className={view === 'feed' ? 'chosen' : ''} onClick={() => { setView('feed'); setViewerIndex(null); }}><Home size={23}/>Home</button>
         <button className={view === 'grid' ? 'chosen' : ''} onClick={() => { setView('grid'); setViewerIndex(null); }}><Grid3X3 size={23}/>Photos</button>
@@ -568,7 +584,7 @@ export default function Page() {
           <small>Configurable upload safety limit · compressed photos</small>
         </div>}
         <div className="account">
-          <div className="avatar">{config.profileInitial}</div>
+          <ProfileAvatar config={config}/>
           <div><b>{config.profileName}</b><small>@{config.profileHandle}</small></div>
           {config.isAdmin && config.passwordLoginEnabled
             ? <button aria-label="Sign out" onClick={logout}><LogOut size={16}/></button>
@@ -583,7 +599,7 @@ export default function Page() {
         {config.isAdmin && <button className="primary" onClick={() => setModal('create')}><PlusSquare size={17}/> New post</button>}
       </header>
       <div className="profile">
-        <div className="avatar large">{config.profileInitial}</div>
+        <ProfileAvatar config={config} size="large"/>
         <div>
           <div className="profilename">{config.profileHandle} <span><Lock size={12}/>{config.visibilityLabel}</span></div>
           <p>{config.profileBio}</p>
