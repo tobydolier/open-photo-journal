@@ -14,6 +14,7 @@ import {
   Lock,
   LogIn,
   LogOut,
+  Maximize2,
   PlusSquare,
   Search,
   Share2,
@@ -31,6 +32,10 @@ type Post = {
   bytes: number;
   favorite: number;
 };
+
+type FeaturedPhoto = { slot: number; postId: string; key: string; src: string; caption: string };
+type FrameStyle = '' | 'white' | 'mahogany' | 'black';
+type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''> };
 
 type ArchivePost = { caption: string; date: string; paths: string[] };
 type JsonMedia = { uri?: string; title?: string; creation_timestamp?: number };
@@ -120,19 +125,56 @@ async function compress(file: File) {
   });
 }
 
-function Photo({ post, siteName, isAdmin, onFeature }: { post: Post; siteName: string; isAdmin: boolean; onFeature: (post:Post,mediaKey:string,slot:number)=>Promise<void> }) {
+function Photo({
+  post, siteName, isAdmin, photoFrames, onOpen, onFrame, onFeature,
+}: {
+  post: Post;
+  siteName: string;
+  isAdmin: boolean;
+  photoFrames: PhotoFrame[];
+  onOpen: (post: Post, mediaIndex: number) => void;
+  onFrame: (post: Post, mediaKey: string, style: FrameStyle) => Promise<boolean>;
+  onFeature: (post: Post, mediaKey: string, slot: number) => Promise<void>;
+}) {
   const [index, setIndex] = useState(0);
+  const [savingFrame, setSavingFrame] = useState(false);
+  const [frameError, setFrameError] = useState(false);
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
-  return <div className="photo">
-    <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async"/>
-    {isAdmin && <label className="feature-photo-control">Feature in homepage frame
-      <select key={post.id + ':' + index} defaultValue="" aria-label="Choose homepage frame" onChange={event => {const slot=Number(event.target.value); if(event.target.value !== '') void onFeature(post,post.media[index],slot); event.target.value='';}}>
-        <option value="">Choose frame…</option>
-        <option value="0">Gallery White</option>
-        <option value="1">Carved Mahogany</option>
-        <option value="2">Black Box</option>
-      </select>
-    </label>}
+  const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
+  return <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`}>
+    <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
+      <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async"/>
+      <span className="expand"><Maximize2 size={16}/> Full screen</span>
+    </button>
+    {isAdmin && <div className="photo-owner-controls">
+      <label className={`feature-photo-control ${frameError ? 'frame-save-error' : ''}`}>
+        <span aria-live="polite">{savingFrame ? 'Saving…' : frameError ? 'Couldn’t save' : 'Frame style'}</span>
+        <select key={`style:${post.id}:${index}`} value={frameStyle} disabled={savingFrame} aria-label="Choose photo frame" onChange={async event => {
+          setSavingFrame(true);
+          setFrameError(false);
+          const saved = await onFrame(post, post.media[index], event.target.value as FrameStyle);
+          setFrameError(!saved);
+          setSavingFrame(false);
+        }}>
+          <option value="">No frame</option>
+          <option value="white">Gallery white</option>
+          <option value="mahogany">Carved mahogany</option>
+          <option value="black">Black box</option>
+        </select>
+      </label>
+      <label className="feature-photo-control landing-feature-control">Feature on landing
+        <select key={`landing:${post.id}:${index}`} defaultValue="" aria-label="Choose landing-page frame" onChange={event => {
+          const slot=Number(event.target.value);
+          if(event.target.value !== '') void onFeature(post,post.media[index],slot);
+          event.target.value='';
+        }}>
+          <option value="">Choose slot…</option>
+          <option value="0">Gallery white</option>
+          <option value="1">Carved mahogany</option>
+          <option value="2">Black box</option>
+        </select>
+      </label>
+    </div>}
     {post.media.length > 1 && <>
       <span className="count">{index + 1}/{post.media.length}</span>
       <button className="prev" aria-label="Previous photo" onClick={() => setIndex((index + post.media.length - 1) % post.media.length)}><ChevronLeft size={18}/></button>
@@ -155,19 +197,25 @@ export default function Page() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState<Post | null>(null);
+  const [photoFrames, setPhotoFrames] = useState<PhotoFrame[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const folder = useRef<HTMLInputElement>(null);
 
   async function load() {
-    const [postsResponse, configResponse] = await Promise.all([
+    const [postsResponse, configResponse, framesResponse] = await Promise.all([
       fetch('/api/posts'),
       fetch('/api/config', { cache: 'no-store' }),
+      fetch('/api/photo-frames', { cache: 'no-store' }),
     ]);
     if (!postsResponse.ok) throw Error('Could not load the photos. Please refresh.');
     if (!configResponse.ok) throw Error('Could not load the journal settings. Please refresh.');
     setPosts(await postsResponse.json());
     setConfig(await configResponse.json());
+    if (framesResponse.ok) {
+      const data = await framesResponse.json() as { frames?: PhotoFrame[] };
+      setPhotoFrames(data.frames || []);
+    }
   }
 
   useEffect(() => {
@@ -308,6 +356,24 @@ export default function Page() {
     }
   }
 
+  async function setPhotoFrame(post: Post, mediaKey: string, style: FrameStyle) {
+    try {
+      const response = await fetch('/api/photo-frames', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, mediaKey, style }),
+      });
+      if (!response.ok) throw Error(await response.text() || 'Could not save frame');
+      await load();
+      const frameName = style ? ({ white: 'Gallery white', mahogany: 'Carved mahogany', black: 'Black box' } as const)[style] : 'No frame';
+      setStatus(`${frameName} saved for this photograph.`);
+      return true;
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : String(cause));
+      return false;
+    }
+  }
+
   async function featurePhoto(post:Post, mediaKey:string, slot:number) {
     if(!config.isAdmin || busy)return;
     setBusy(true);
@@ -331,7 +397,7 @@ export default function Page() {
         body: JSON.stringify({ id: post.id }),
       });
       if (!response.ok) throw Error(await response.text() || 'Delete failed');
-      setSelected(null);
+      setViewerIndex(null);
       await load();
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : String(cause));
@@ -370,6 +436,16 @@ export default function Page() {
   ));
   const used = posts.reduce((total, post) => total + post.bytes, 0);
   const dateFormat = (value: string) => new Date(value).toLocaleDateString(config.locale, { day: 'numeric', month: 'long', year: 'numeric' });
+  const photoItems = posts.flatMap(post => post.media.map((key, mediaIndex) => ({ post, key, mediaIndex })));
+  const openPhoto = (post: Post, mediaIndex: number) => {
+    const index = photoItems.findIndex(item => item.post.id === post.id && item.mediaIndex === mediaIndex);
+    if (index >= 0) setViewerIndex(index);
+  };
+  const viewer = viewerIndex === null ? null : photoItems[viewerIndex];
+  const viewerFrameStyle: FrameStyle = viewer
+    ? photoFrames.find(frame => frame.postId === viewer.post.id && frame.key === viewer.key)?.style || ''
+    : '';
+
 
   const postCard = (post: Post) => <article key={post.id}>
     <div className="posthead">
@@ -377,7 +453,7 @@ export default function Page() {
       <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
-    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} onFeature={featurePhoto}/>
+    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} onOpen={openPhoto} onFrame={setPhotoFrame} onFeature={featurePhoto}/>
     <div className="postbody">
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
@@ -398,9 +474,9 @@ export default function Page() {
     <aside>
       <a className="wordmark" href="/">{config.siteName}<span>•</span></a>
       <nav>
-        <button className={view === 'feed' ? 'chosen' : ''} onClick={() => { setView('feed'); setSelected(null); }}><Home size={23}/>Home</button>
-        <button className={view === 'grid' ? 'chosen' : ''} onClick={() => { setView('grid'); setSelected(null); }}><Grid3X3 size={23}/>Photos</button>
-        {config.isAdmin && <button className={view === 'saved' ? 'chosen' : ''} onClick={() => { setView('saved'); setSelected(null); }}><Heart size={23}/>Favourites</button>}
+        <button className={view === 'feed' ? 'chosen' : ''} onClick={() => { setView('feed'); setViewerIndex(null); }}><Home size={23}/>Home</button>
+        <button className={view === 'grid' ? 'chosen' : ''} onClick={() => { setView('grid'); setViewerIndex(null); }}><Grid3X3 size={23}/>Photos</button>
+        {config.isAdmin && <button className={view === 'saved' ? 'chosen' : ''} onClick={() => { setView('saved'); setViewerIndex(null); }}><Heart size={23}/>Favourites</button>}
         {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare size={23}/>Create</button>}
         {config.isAdmin && <button onClick={() => setModal('import')}><Download size={23}/>Import Instagram</button>}
       </nav>
@@ -453,7 +529,7 @@ export default function Page() {
       <section className={view === 'grid' ? 'grid' : 'feed'}>
         {visible.length
           ? view === 'grid'
-            ? visible.map(post => <button className="tile" key={post.id} onClick={() => setSelected(post)}>
+            ? visible.map(post => <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
               <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
               {post.source === 'instagram' && <span>↗</span>}
               {post.media.length > 1 && <b>{post.media.length} photos</b>}
@@ -490,12 +566,20 @@ export default function Page() {
         : config.passwordLoginEnabled && <button onClick={() => setModal('login')}><LogIn/></button>}
     </div>
 
-    {(modal || selected) && <div className="overlay">
-      <div className={`dialog ${selected ? 'detail' : ''}`}>
-        <button className="close" disabled={busy} aria-label="Close" onClick={() => { setModal(''); setSelected(null); }}><X/></button>
-        {selected
-          ? postCard(posts.find(post => post.id === selected.id) || selected)
-          : modal === 'create'
+    {viewer && viewerIndex !== null && <div className="lightbox" role="dialog" aria-modal="true" aria-label="Full-screen photo viewer">
+      <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
+      <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
+      <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''}`}>
+        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`}/></div>
+      </div>
+      <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
+      <div className="lightbox-caption"><b>{viewer.post.caption || 'A moment worth keeping.'}</b><span>{dateFormat(viewer.post.date)} · {viewerIndex + 1} of {photoItems.length}</span></div>
+    </div>}
+
+    {modal && <div className="overlay">
+      <div className="dialog">
+        <button className="close" disabled={busy} aria-label="Close" onClick={() => setModal('')}><X/></button>
+        {modal === 'create'
             ? <>
               <span className="eyebrow">A NEW MEMORY</span>
               <h2>Create a post</h2>

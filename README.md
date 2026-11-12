@@ -21,7 +21,7 @@ Lightroom, or wherever the owner already keeps them.
 - Browser-side WebP resizing and re-encoding, which removes embedded EXIF/GPS
 - Configurable name, profile, locale, storage ceiling, and canonical URL
 - ChatGPT Sites or Cloudflare Access identity, with optional password login
-- D1 schema and migration, R2 media storage, and an MIT licence
+- D1 schema and migrations, R2 media storage, per-photo frame styles, full-screen viewing, and an MIT licence
 
 ## Data boundary
 
@@ -69,12 +69,18 @@ cp .dev.vars.example .dev.vars
 pnpm build
 ```
 
-Apply the initial migration to the local D1 database after the first build:
+Apply the migrations to the local D1 database after the first build:
 
 ```bash
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
   d1 execute DB --local --config dist/server/wrangler.json \
   --persist-to .wrangler/state --file drizzle/0000_outstanding_viper.sql
+
+for migration in drizzle/0001_framefeed_interest.sql drizzle/0002_manual_post_order.sql drizzle/0003_featured_photos.sql drizzle/0004_photo_frames.sql; do
+  node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
+    d1 execute DB --local --config dist/server/wrangler.json \
+    --persist-to .wrangler/state --file "$migration"
+done
 ```
 
 Then run:
@@ -91,9 +97,12 @@ contains no `project_id`: creating a new Site from the source assigns a fresh ID
 and fresh data resources to that installation. Never copy a `project_id` from
 another deployment.
 
-The runtime is Cloudflare-native. A documented standalone Cloudflare deployment
-path and automated resource bootstrap are planned before v1.0; until that is
-included, do not describe a raw Worker deployment as one-click.
+The runtime is Cloudflare-native. Before the first production deployment, apply
+`drizzle/0000_outstanding_viper.sql` through `drizzle/0004_photo_frames.sql`
+to the production D1 database in numeric order. Configure `ADMIN_PASSWORD`
+and `ADMIN_SESSION_SECRET` as runtime secrets rather than build variables.
+Keep all passwords, account IDs, photographs, and deployment-specific values
+outside this repository.
 
 ## Archive import
 

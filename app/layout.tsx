@@ -1,4 +1,6 @@
 import "./globals.css";
+import "./theme.css";
+import "./photo-frames.css";
 import { getPublicSiteConfig } from "../lib/site-config";
 
 export function generateMetadata() {
