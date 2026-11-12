@@ -11,6 +11,10 @@ export type PublicSiteConfig = {
   visibilityLabel: string;
   locale: string;
   storageLimitBytes: number;
+  wordmarkImageUrl: string;
+  profileImageUrl: string;
+  faviconUrl: string;
+  shareImageUrl: string;
   isAdmin: boolean;
   passwordLoginEnabled: boolean;
 };
@@ -18,6 +22,18 @@ export type PublicSiteConfig = {
 function text(value: string | undefined, fallback: string, max = 120) {
   const clean = value?.trim();
   return (clean || fallback).slice(0, max);
+}
+
+function assetUrl(value: string | undefined) {
+  const clean = value?.trim();
+  if (!clean) return "";
+  if (clean.startsWith("/") && !clean.startsWith("//")) return clean.slice(0, 500);
+  try {
+    const url = new URL(clean);
+    return url.protocol === "https:" ? clean.slice(0, 500) : "";
+  } catch {
+    return "";
+  }
 }
 
 function positiveNumber(value: string | undefined, fallback: number) {
@@ -40,6 +56,10 @@ export function getPublicSiteConfig(): Omit<PublicSiteConfig, "isAdmin" | "passw
     visibilityLabel: text(env.VISIBILITY_LABEL, "Photo journal", 40),
     locale: text(env.SITE_LOCALE, "en-GB", 20),
     storageLimitBytes: positiveNumber(env.STORAGE_LIMIT_BYTES, 8_000_000_000),
+    wordmarkImageUrl: assetUrl(env.WORDMARK_IMAGE_URL),
+    profileImageUrl: assetUrl(env.PROFILE_IMAGE_URL),
+    faviconUrl: assetUrl(env.FAVICON_URL),
+    shareImageUrl: assetUrl(env.SHARE_IMAGE_URL),
   };
 }
 
