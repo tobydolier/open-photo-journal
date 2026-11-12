@@ -10,6 +10,12 @@ PROFILE_INITIAL="y"
 VISIBILITY_LABEL="Photo journal"
 STORAGE_LIMIT_BYTES="8000000000"
 
+# Optional visual branding. Use root-relative paths or HTTPS URLs.
+WORDMARK_IMAGE_URL=""
+PROFILE_IMAGE_URL=""
+FAVICON_URL=""
+SHARE_IMAGE_URL=""
+
 # Use the canonical public URL for reliable sharing cards after launch.
 PUBLIC_SITE_URL="https://photos.example.com"
 
