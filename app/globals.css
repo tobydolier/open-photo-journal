@@ -7,3 +7,10 @@
 
 /* Curate featured homepage photographs without copying media. Owner-only. */
 .feature-photo-control{position:absolute;left:12px;bottom:36px;z-index:2;display:flex;align-items:center;gap:9px;max-width:calc(100% - 24px);padding:9px 11px;border-radius:8px;background:#fffef7eb;box-shadow:0 2px 14px #0002;color:#365445;font-size:11px;font-weight:600;flex-wrap:wrap}.feature-photo-control select{min-width:135px;max-width:100%;padding:6px 8px;border-radius:5px;border:1px solid #bccfc1;background:#fff;color:#273b30;font-size:12px}.feature-photo-control:focus-within{outline:2px solid #749584}.photo:has(.feature-photo-control){padding-bottom:0}@media(max-width:560px){.feature-photo-control{left:7px;bottom:27px;padding:5px 7px;font-size:10px;gap:5px}.feature-photo-control select{min-width:110px;font-size:11px}}
+
+
+/* Optional deployment-specific visual branding. */
+.wordmark-image{display:block;max-width:180px;max-height:58px;width:auto;height:auto;object-fit:contain;object-position:left center}
+.avatar{overflow:hidden}
+.avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+@media(max-width:760px){.wordmark-image{max-width:145px;max-height:44px}}
