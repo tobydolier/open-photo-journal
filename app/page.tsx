@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Camera,
   Check,
@@ -125,6 +126,62 @@ async function compress(file: File) {
   });
 }
 
+function mutedDominantColour(image: HTMLImageElement) {
+  try {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context || !image.naturalWidth || !image.naturalHeight) return '';
+
+    const scale = Math.min(size / image.naturalWidth, size / image.naturalHeight);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    context.clearRect(0, 0, size, size);
+    context.drawImage(image, Math.floor((size - width) / 2), Math.floor((size - height) / 2), width, height);
+
+    const pixels = context.getImageData(0, 0, size, size).data;
+    const buckets = new Map<number, { count: number; red: number; green: number; blue: number }>();
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] < 200) continue;
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+      const key = ((red >> 4) << 8) | ((green >> 4) << 4) | (blue >> 4);
+      const bucket = buckets.get(key) || { count: 0, red: 0, green: 0, blue: 0 };
+      bucket.count++;
+      bucket.red += red;
+      bucket.green += green;
+      bucket.blue += blue;
+      buckets.set(key, bucket);
+    }
+
+    const dominant = Array.from(buckets.values()).sort((left, right) => right.count - left.count)[0];
+    if (!dominant) return '';
+    const red = dominant.red / dominant.count / 255;
+    const green = dominant.green / dominant.count / 255;
+    const blue = dominant.blue / dominant.count / 255;
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const delta = maximum - minimum;
+    const lightness = (maximum + minimum) / 2;
+    let hue = 0;
+    if (delta) {
+      if (maximum === red) hue = ((green - blue) / delta) % 6;
+      else if (maximum === green) hue = (blue - red) / delta + 2;
+      else hue = (red - green) / delta + 4;
+      hue = (hue * 60 + 360) % 360;
+    }
+    const saturation = delta ? delta / (1 - Math.abs(2 * lightness - 1)) : 0;
+    const mutedSaturation = Math.round(Math.min(28, saturation * 38));
+    const mountLightness = Math.round(Math.min(86, Math.max(68, lightness * 100 + 28)));
+    return `hsl(${Math.round(hue)} ${mutedSaturation}% ${mountLightness}%)`;
+  } catch {
+    return '';
+  }
+}
+
 function Photo({
   post, siteName, isAdmin, photoFrames, onOpen, onFrame, onFeature,
 }: {
@@ -139,11 +196,14 @@ function Photo({
   const [index, setIndex] = useState(0);
   const [savingFrame, setSavingFrame] = useState(false);
   const [frameError, setFrameError] = useState(false);
+  const [mountColour, setMountColour] = useState('');
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
+  useEffect(() => setMountColour(''), [src]);
   const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
-  return <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`}>
+  const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
+  return <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
-      <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async"/>
+      <img src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
     </button>
     {isAdmin && <div className="photo-owner-controls">
@@ -199,6 +259,7 @@ export default function Page() {
   const [error, setError] = useState('');
   const [photoFrames, setPhotoFrames] = useState<PhotoFrame[]>([]);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
   const folder = useRef<HTMLInputElement>(null);
 
@@ -445,6 +506,8 @@ export default function Page() {
   const viewerFrameStyle: FrameStyle = viewer
     ? photoFrames.find(frame => frame.postId === viewer.post.id && frame.key === viewer.key)?.style || ''
     : '';
+  useEffect(() => setViewerMountColour(''), [viewer?.key]);
+  const viewerMountStyle = viewerMountColour ? ({ '--mahogany-mount': viewerMountColour } as CSSProperties) : undefined;
 
 
   const postCard = (post: Post) => <article key={post.id}>
@@ -569,8 +632,8 @@ export default function Page() {
     {viewer && viewerIndex !== null && <div className="lightbox" role="dialog" aria-modal="true" aria-label="Full-screen photo viewer">
       <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
       <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
-      <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''}`}>
-        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`}/></div>
+      <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''}`} style={viewerMountStyle}>
+        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget))}/></div>
       </div>
       <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
       <div className="lightbox-caption"><b>{viewer.post.caption || 'A moment worth keeping.'}</b><span>{dateFormat(viewer.post.date)} · {viewerIndex + 1} of {photoItems.length}</span></div>
