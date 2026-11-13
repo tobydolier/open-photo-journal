@@ -743,7 +743,7 @@ export default function Page() {
           {galleryItems.length ? galleryItems.map(({photo,post,mediaIndex,frameStyle,slot}) =>
             <button key={slot} className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => openPhoto(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
               <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'}`}>
-                <span className="gallery-mount"><img src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async"/></span>
+                <span className="photo-open gallery-mount"><img src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async"/></span>
               </span>
               <small>{photo.caption || 'Untitled'}</small>
             </button>)

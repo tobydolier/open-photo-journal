@@ -18,6 +18,10 @@ if (cfg.name !== "framefeed" ||
   console.error("Refusing to deploy: generated Worker name or D1/R2 bindings do not match FrameFeed.");
   process.exit(1);
 }
-const result = spawnSync("pnpm", ["exec", "wrangler", "deploy", "--config", configPath], { stdio: "inherit" });
+let result = spawnSync("pnpm", ["exec", "wrangler", "deploy", "--config", configPath], { stdio: "inherit" });
+if (result.error?.code === "ENOENT") {
+  console.log("pnpm is not on PATH; using the project's Corepack pnpm instead.");
+  result = spawnSync("corepack", ["pnpm", "exec", "wrangler", "deploy", "--config", configPath], { stdio: "inherit" });
+}
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);
