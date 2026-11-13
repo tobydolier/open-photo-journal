@@ -11,10 +11,13 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
-// FrameFeed's standalone Worker is opt-in. The existing ChatGPT Sites build
-// retains its original isolated placeholder resources unless explicitly built
-// with FRAMEFEED_DEPLOY=1.
-const framefeedDeploy = process.env.FRAMEFEED_DEPLOY === "1";
+// FrameFeed's standalone Worker is opt-in for local builds. Cloudflare injects
+// WORKERS_CI=1 into repository builds, so pushes to the connected production
+// branch use the same verified D1/R2 profile as a manual FrameFeed deployment.
+// Other self-hosters must replace the documented resource identifiers with
+// resources from their own Cloudflare account before connecting a fork.
+const framefeedDeploy = process.env.FRAMEFEED_DEPLOY === "1" ||
+  process.env.WORKERS_CI === "1";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";

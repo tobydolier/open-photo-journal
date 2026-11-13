@@ -42,6 +42,17 @@ The experimental standalone deployment on this branch now has an opt-in build pr
 - Build: `FRAMEFEED_DEPLOY=1 pnpm run build`
 - Deploy: `node scripts/deploy-framefeed.mjs`
 
+Cloudflare Workers Builds injects `WORKERS_CI=1`. The upstream FrameFeed
+repository recognises that signal automatically, so a push to the connected
+production branch builds the verified `framefeed` Worker profile rather than
+the isolated template/preview profile. Local and ChatGPT preview builds remain
+isolated unless `FRAMEFEED_DEPLOY=1` is supplied explicitly.
+
+Forks must replace the D1 database ID/name and R2 bucket name in
+`vite.config.ts` with resources in their own Cloudflare account before enabling
+Workers Builds. Cloudflare resource IDs are not credentials, but they are
+deployment-specific and must not be reused between installations.
+
 The deploy script refuses to run unless the generated Cloudflare Worker is named `framefeed`, the D1 binding is `DB` with database `framefeed-db` and ID `2d43ec6a-9a00-425e-8497-2495a55f2d65`, and the R2 binding is `BUCKET` with bucket `framefeed-media`.
 
 **Important:** This is an untested deployment candidate, not a verified production build. The build may still require migration away from ChatGPT Sites-specific plugins and the current vinext packaging. Do not change DNS or import private data until test deployment checks pass. Cloudflare's initial repository-connect UI may select `main` by default; do not run the default deploy while these changes exist only on `prepare-framefeed-cloudflare`. Cloudflare supports changing the production branch under Worker Settings → Build → Branch control **after** a Worker is created.
