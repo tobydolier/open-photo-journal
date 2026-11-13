@@ -1,0 +1,6 @@
+/* The original landing-page wood frame is now the lighter Textured oak. */
+.ff-frame-mahogany{
+  background:repeating-linear-gradient(135deg,#a16c49 0,#74482f 5px,#bd855b 9px,#5d3725 13px);
+  border-color:#8f5e3d;
+  box-shadow:0 15px 27px #49332336,inset 0 0 0 4px #d2aa73;
+}

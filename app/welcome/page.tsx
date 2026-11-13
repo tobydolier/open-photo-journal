@@ -1,10 +1,11 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import "./landing.css";
+import "./frame-overrides.css";
 
 const photos = [
   {title:"Gallery White",cls:"white",alt:"Landscape photograph coming soon"},
-  {title:"Carved Mahogany",cls:"mahogany",alt:"Landscape photograph coming soon"},
+  {title:"Textured Oak",cls:"mahogany",alt:"Landscape photograph coming soon"},
   {title:"Black Box",cls:"black",alt:"Landscape photograph coming soon"},
 ];
 export default function WelcomePage(){

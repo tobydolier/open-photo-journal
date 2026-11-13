@@ -32,96 +32,109 @@
 .photo-framed .photo-open img{height:auto}
 
 
-/* A deeper, carved mahogany treatment: irregular grain, layered moulding,
-   gilt sight edge and restrained corner ornament. */
-.photo-frame-mahogany,
-.lightbox-frame-mahogany{
+/* The original carved frame is retained as Textured oak. Existing saved
+   `mahogany` values continue to use it, so old posts do not change frames. */
+.photo-frame-mahogany,.lightbox-frame-mahogany,.gallery-frame.photo-frame-mahogany{
   position:relative;
   isolation:isolate;
-  padding:22px;
-  border:3px solid #2b1008;
+  padding:20px;
+  border:3px solid #52301d;
   background:
-    radial-gradient(circle at 10px 10px,#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
-    radial-gradient(circle at calc(100% - 10px) 10px,#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
-    radial-gradient(circle at 10px calc(100% - 10px),#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
-    radial-gradient(circle at calc(100% - 10px) calc(100% - 10px),#e0b46d 0 2px,#5a2817 3px 6px,transparent 7px),
-    repeating-linear-gradient(92deg,transparent 0 7px,#f1bd7314 8px,#21090530 10px,transparent 13px),
-    repeating-linear-gradient(7deg,#6f321f 0,#4c1d11 4px,#8e4b2e 8px,#351109 12px,#71331f 17px);
-  box-shadow:
-    0 8px 18px #2a130b40,
-    inset 0 0 0 2px #d2a15c,
-    inset 0 0 0 6px #3a160c,
-    inset 0 0 0 9px #ad7139;
+    radial-gradient(circle at 10px 10px,#e8c68e 0 2px,#805238 3px 6px,transparent 7px),
+    radial-gradient(circle at calc(100% - 10px) 10px,#e8c68e 0 2px,#805238 3px 6px,transparent 7px),
+    radial-gradient(circle at 10px calc(100% - 10px),#e8c68e 0 2px,#805238 3px 6px,transparent 7px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 10px),#e8c68e 0 2px,#805238 3px 6px,transparent 7px),
+    repeating-linear-gradient(92deg,transparent 0 8px,#fff0c61c 9px,#4f2b1830 11px,transparent 15px),
+    repeating-linear-gradient(7deg,#9a6745 0,#74472e 5px,#b47d55 9px,#5d3522 13px,#95613f 18px);
+  box-shadow:0 7px 16px #3e2a1c2f,inset 0 0 0 2px #dfbd84,inset 0 0 0 6px #62402a,inset 0 0 0 9px #b27c51;
 }
-.photo-frame-mahogany::before,
-.lightbox-frame-mahogany::before{
-  content:"";
-  position:absolute;
-  inset:7px;
-  z-index:1;
-  pointer-events:none;
-  border:3px double #d5a65f;
-  box-shadow:0 0 0 2px #38140b,inset 0 0 0 2px #4c2113;
+.photo-frame-mahogany::before,.lightbox-frame-mahogany::before,.gallery-frame.photo-frame-mahogany::before{
+  content:"";position:absolute;inset:7px;z-index:1;pointer-events:none;border:3px double #e0bd83;box-shadow:0 0 0 2px #5d3824,inset 0 0 0 2px #785039;
 }
-.photo-frame-mahogany::after,
-.lightbox-frame-mahogany::after{
-  content:"";
-  position:absolute;
-  inset:13px;
-  z-index:1;
-  pointer-events:none;
-  border:2px groove #a36c39;
-  box-shadow:inset 0 0 5px #1c0806b8,0 0 3px #e2bb7966;
+.photo-frame-mahogany::after,.lightbox-frame-mahogany::after,.gallery-frame.photo-frame-mahogany::after{
+  content:"";position:absolute;inset:13px;z-index:1;pointer-events:none;border:2px groove #bb875a;box-shadow:inset 0 0 4px #4b291aa8,0 0 3px #f1d5a466;
 }
-.photo-frame-mahogany .photo-open,
-.lightbox-frame-mahogany .lightbox-mount{
-  position:relative;
-  z-index:2;
-  border:5px double #cda363;
-  box-shadow:0 0 0 2px #3a160d,inset 0 0 0 1px #f0d69a;
-  background:var(--mahogany-mount,#f5ead8);
-  transition:background-color .35s ease;
+.photo-frame-mahogany .photo-open,.lightbox-frame-mahogany .lightbox-mount{
+  position:relative;z-index:2;border:5px double #d1ad75;box-shadow:0 0 0 2px #62402a,inset 0 0 0 1px #f3dfb4;background:var(--mahogany-mount,#eee1cc);transition:background-color .35s ease;
 }
+
+/* Flat natural pine: one square-cut strip, sparse directional grain and no
+   bevels, ridges or simulated raised profile. */
+.photo-frame-pine,.lightbox-frame-pine,.gallery-frame.photo-frame-pine{
+  position:relative;isolation:isolate;padding:15px;border:1px solid #b4864f;background:#dfb87e;box-shadow:none;
+}
+.photo-frame-pine::before,.lightbox-frame-pine::before,.gallery-frame.photo-frame-pine::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.58;
+  background:
+    linear-gradient(90deg,transparent 5%,#8f5e2d42 21%,transparent 34%,transparent 68%,#9a68333b 83%,transparent 96%) top/100% 15px no-repeat,
+    linear-gradient(90deg,transparent 12%,#f4d8a84c 43%,transparent 62%,#97642f38 86%,transparent) bottom/100% 15px no-repeat,
+    linear-gradient(0deg,transparent 7%,#95612e40 29%,transparent 43%,transparent 72%,#f4d8a84a 91%,transparent) left/15px 100% no-repeat,
+    linear-gradient(0deg,transparent 10%,#f1d4a347 36%,transparent 54%,#93602d3b 82%,transparent) right/15px 100% no-repeat;
+}
+.photo-frame-pine .photo-open,.lightbox-frame-pine .lightbox-mount{
+  position:relative;z-index:2;padding:5%;border:1px solid #a87842;background:var(--pine-mount,#e5ded0);box-shadow:none;transition:background-color .35s ease;
+}
+
+/* Ornate mahogany has an exact, equal moulding width on all four sides. The
+   timber pieces use original procedural textures bundled with the MIT project;
+   stable post-ID variants change tone, grain placement and small flourishes. */
+.photo-frame-ornate,.lightbox-frame-ornate,.gallery-frame.photo-frame-ornate{
+  --ornate-width:22px;
+  position:relative;isolation:isolate;overflow:visible;padding:var(--ornate-width);border:0;background:transparent;box-shadow:0 8px 18px #28130d38;
+}
+.ornate-frame-work{position:absolute;inset:0;z-index:0;overflow:visible;pointer-events:none}
+.ornate-wood{position:absolute;background-repeat:no-repeat;background-size:cover;border:1px solid #210b07}
+.ornate-top,.ornate-bottom{
+  left:0;width:100%;height:var(--ornate-width);
+  background-image:linear-gradient(180deg,#140604b5,#d29b7430 23%,transparent 52%,#110504a8 84%,#b17a5638),url('/frames/mahogany-grain-horizontal.webp');
+}
+.ornate-top{top:0;clip-path:polygon(0 0,100% 0,calc(100% - var(--ornate-width)) 100%,var(--ornate-width) 100%)}
+.ornate-bottom{bottom:0;clip-path:polygon(var(--ornate-width) 0,calc(100% - var(--ornate-width)) 0,100% 100%,0 100%);transform:rotate(180deg)}
+.ornate-left,.ornate-right{
+  top:0;height:100%;width:var(--ornate-width);
+  background-image:linear-gradient(90deg,#140604b5,#d29b7430 23%,transparent 52%,#110504a8 84%,#b17a5638),url('/frames/mahogany-grain-vertical.webp');
+}
+.ornate-left{left:0;clip-path:polygon(0 0,100% var(--ornate-width),100% calc(100% - var(--ornate-width)),0 100%)}
+.ornate-right{right:0;clip-path:polygon(0 0,100% 0,100% 100%,0 calc(100% - var(--ornate-width)),0 var(--ornate-width));transform:rotate(180deg)}
+.photo-frame-ornate .photo-open,.lightbox-frame-ornate .lightbox-mount{
+  position:relative;z-index:2;padding:5%;border:4px double #9b6a49;background:var(--mahogany-mount,#d3c8b6);box-shadow:0 0 0 2px #2c100b,inset 0 0 0 1px #eee1cb;transition:background-color .35s ease;
+}
+.ornate-flourish{position:absolute;z-index:1;width:10px;height:7px;background:linear-gradient(#9d603f,#3b160f 70%,#1b0805);border:1px solid #210906;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.ornate-flourish-1{left:18%;top:-5px}.ornate-flourish-2{left:34%;top:-5px}.ornate-flourish-3{left:50%;top:-8px;width:22px;height:10px;transform:translateX(-50%)}.ornate-flourish-4{left:66%;top:-5px}.ornate-flourish-5{left:82%;top:-5px}
+.ornate-flourish-6{left:24%;bottom:-5px}.ornate-flourish-7{left:42%;bottom:-5px}.ornate-flourish-8{left:58%;bottom:-5px}.ornate-flourish-9{left:76%;bottom:-5px}
+.ornate-flourish-10{left:-5px;top:30%;width:7px;height:10px}.ornate-flourish-11{left:-5px;top:50%;width:7px;height:10px}.ornate-flourish-12{left:-5px;top:70%;width:7px;height:10px}
+.ornate-flourish-13{right:-5px;top:33%;width:7px;height:10px}.ornate-flourish-14{right:-5px;top:52%;width:7px;height:10px}.ornate-flourish-15{right:-5px;top:72%;width:7px;height:10px}
+.frame-variant-0 .ornate-top{filter:brightness(.96)}.frame-variant-0 .ornate-right{filter:brightness(1.08)}.frame-variant-0 .ornate-bottom{filter:brightness(.86)}.frame-variant-0 .ornate-left{filter:brightness(1.01)}
+.frame-variant-1 .ornate-top{filter:brightness(1.08);background-position:24% 52%}.frame-variant-1 .ornate-right{filter:brightness(.91);background-position:64% 24%}.frame-variant-1 .ornate-bottom{filter:brightness(1.01);background-position:76% 48%}.frame-variant-1 .ornate-left{filter:brightness(.95);background-position:32% 74%}
+.frame-variant-2 .ornate-top{filter:brightness(.89);background-position:72% 40%}.frame-variant-2 .ornate-right{filter:brightness(1.04);background-position:38% 68%}.frame-variant-2 .ornate-bottom{filter:brightness(.96);background-position:18% 60%}.frame-variant-2 .ornate-left{filter:brightness(1.1);background-position:80% 30%}
+.frame-variant-1 .ornate-flourish-2{left:31%;transform:scale(.84)}.frame-variant-1 .ornate-flourish-4{left:69%;transform:rotate(12deg)}.frame-variant-1 .ornate-flourish-8{left:61%;transform:scale(1.12)}.frame-variant-1 .ornate-flourish-11{top:47%}
+.frame-variant-2 .ornate-flourish-1{left:21%;transform:rotate(-10deg)}.frame-variant-2 .ornate-flourish-3{width:18px;transform:translateX(-50%) scale(.9)}.frame-variant-2 .ornate-flourish-6{left:20%}.frame-variant-2 .ornate-flourish-9{left:80%}.frame-variant-2 .ornate-flourish-14{top:57%;transform:scale(.82)}
+
+.lightbox-frame-pine .lightbox-mount,.lightbox-frame-ornate .lightbox-mount{padding:clamp(15px,3.5vw,46px)}
 @media(min-width:1100px){
-  .photo-frame-mahogany{--frame-outset:58px}
+  .photo-frame-mahogany{--frame-outset:56px}
+  .photo-frame-pine{--frame-outset:46px}
+  .photo-frame-ornate{--frame-outset:58px;--ornate-width:24px}
 }
 @media(max-width:760px){
-  .photo-frame-mahogany,.lightbox-frame-mahogany{padding:11px;border-width:2px}
+  .photo-frame-mahogany,.lightbox-frame-mahogany{padding:10px;border-width:2px}
   .photo-frame-mahogany::before,.lightbox-frame-mahogany::before{inset:3px;border-width:2px}
   .photo-frame-mahogany::after,.lightbox-frame-mahogany::after{inset:7px;border-width:1px}
   .photo-frame-mahogany .photo-open,.lightbox-frame-mahogany .lightbox-mount{border-width:3px}
-}
+  .photo-frame-pine,.lightbox-frame-pine{padding:8px}
+  .photo-frame-ornate,.lightbox-frame-ornate{--ornate-width:10px}
+  .gallery-frame.photo-frame-ornate{--ornate-width:7px}
+  .gallery-frame .ornate-flourish-2,.gallery-frame .ornate-flourish-4,.gallery-frame .ornate-flourish-7,.gallery-frame .ornate-flourish-9,.gallery-frame .ornate-flourish-11,.gallery-frame .ornate-flourish-14{display:none}
+  .gallery-frame .ornate-flourish{transform:scale(.65)}
 
-/* A simple natural pine moulding. Grain follows each piece of timber: across
-   the rails and down the stiles, with broad irregular variations rather than
-   a regular stripe pattern. */
-.photo-frame-pine,.lightbox-frame-pine,.gallery-frame.photo-frame-pine{
-  position:relative;
-  isolation:isolate;
-  padding:15px;
-  border:2px solid #9c6c35;
-  background:
-    radial-gradient(ellipse at 13% 26%,#895a2b99 0 1px,#c8945570 2px 5px,transparent 7px),
-    radial-gradient(ellipse at 84% 73%,#8d5b2c80 0 1px,#d1a36a55 2px 6px,transparent 8px),
-    linear-gradient(135deg,#dfb77d,#c99353 48%,#e2b97d);
-  box-shadow:0 7px 16px #4d321d2b,inset 0 0 0 2px #f2d39c,inset 0 0 0 5px #a96f33;
+  /* The framed photograph, mount and moulding now size as one object on an
+     iPhone. The image receives the remaining space after equal mount padding
+     and the complete outer frame are accounted for. */
+  .lightbox-photo-frame{width:max-content;max-width:calc(100vw - 96px);max-height:calc(100dvh - 120px);box-sizing:border-box}
+  .lightbox-photo-frame[class*="lightbox-frame-"]{--lightbox-edge-total:18px;--lightbox-content-total:46px;--lightbox-mount-gap:14px}
+  .lightbox-frame-black{--lightbox-edge-total:22px!important;--lightbox-content-total:50px!important}
+  .lightbox-frame-mahogany{--lightbox-edge-total:24px!important;--lightbox-content-total:52px!important}
+  .lightbox-frame-ornate{--lightbox-edge-total:20px!important;--lightbox-content-total:48px!important}
+  .lightbox-photo-frame[class*="lightbox-frame-"] .lightbox-mount{display:grid;place-items:center;width:max-content;height:max-content;max-width:calc(100vw - 96px - var(--lightbox-edge-total));max-height:calc(100dvh - 120px - var(--lightbox-edge-total));padding:var(--lightbox-mount-gap)!important;box-sizing:border-box}
+  .lightbox-photo-frame[class*="lightbox-frame-"] .lightbox-mount img{display:block;width:auto;height:auto;max-width:calc(100vw - 96px - var(--lightbox-content-total));max-height:calc(100dvh - 120px - var(--lightbox-content-total));object-fit:contain}
 }
-.photo-frame-pine::before,.lightbox-frame-pine::before,.gallery-frame.photo-frame-pine::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  z-index:1;
-  pointer-events:none;
-  opacity:.38;
-  background:
-    linear-gradient(90deg,transparent 0 9%,#7f51272b 16%,transparent 24%,#fff2c52e 42%,transparent 51%,#8b582629 69%,transparent 82%,#fff0bf24) left/15px 100% no-repeat,
-    linear-gradient(90deg,#fff0bd20,transparent 12%,#8151272b 31%,transparent 47%,#f8d8a122 64%,transparent 77%,#83512825) right/15px 100% no-repeat,
-    linear-gradient(0deg,transparent 0 10%,#7e4e2528 19%,transparent 28%,#fff0c324 46%,transparent 57%,#86532625 76%,transparent 90%) top/100% 15px no-repeat,
-    linear-gradient(0deg,#85532820,transparent 14%,#f5d59e22 33%,transparent 49%,#7c4a2228 67%,transparent 81%,#f2d09820) bottom/100% 15px no-repeat;
-}
-.photo-frame-pine .photo-open,.lightbox-frame-pine .lightbox-mount{
-  position:relative;z-index:2;padding:5%;border:2px solid #8e5e2e;background:var(--pine-mount,#f4eedf);box-shadow:inset 0 0 0 1px #fff8e8;transition:background-color .35s ease;
-}
-.lightbox-frame-pine .lightbox-mount{padding:clamp(15px,3.5vw,46px)}
-@media(min-width:1100px){.photo-frame-pine{--frame-outset:46px}}
-@media(max-width:760px){.photo-frame-pine,.lightbox-frame-pine{padding:8px}.lightbox-frame-pine .lightbox-mount{padding:18px}}

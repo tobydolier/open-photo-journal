@@ -37,7 +37,7 @@ type Post = {
 };
 
 type FeaturedPhoto = { slot: number; postId: string; key: string; src: string; caption: string };
-type FrameStyle = '' | 'white' | 'mahogany' | 'black' | 'pine';
+type FrameStyle = '' | 'white' | 'mahogany' | 'ornate' | 'black' | 'pine';
 type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''> };
 
 type ArchivePost = { id?: string; caption: string; date: string; paths: string[] };
@@ -158,6 +158,22 @@ function ProfileAvatar({ config, size = '' }: { config: PublicSiteConfig; size?:
   </div>;
 }
 
+function frameVariant(id: string) {
+  let hash = 0;
+  for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return hash % 3;
+}
+
+function OrnateFrameWork() {
+  return <span className="ornate-frame-work" aria-hidden="true">
+    <span className="ornate-wood ornate-top"/>
+    <span className="ornate-wood ornate-right"/>
+    <span className="ornate-wood ornate-bottom"/>
+    <span className="ornate-wood ornate-left"/>
+    {Array.from({ length: 15 }, (_, index) => <span key={index} className={`ornate-flourish ornate-flourish-${index + 1}`}/>) }
+  </span>;
+}
+
 function mutedDominantColour(image: HTMLImageElement, frame: 'mahogany' | 'pine' = 'mahogany') {
   try {
     const size = 40;
@@ -256,7 +272,8 @@ function Photo({
   const gallerySlot = galleryPhotos.findIndex(photo => photo?.postId === post.id && photo.key === post.media[index]);
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
-    <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
+    <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
+    {frameStyle === 'ornate' && <OrnateFrameWork/>}
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
       <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
@@ -280,7 +297,8 @@ function Photo({
         }}>
           <option value="">No frame</option>
           <option value="white">Gallery white</option>
-          <option value="mahogany">Carved mahogany</option>
+          <option value="mahogany">Textured oak</option>
+          <option value="ornate">Ornate mahogany</option>
           <option value="black">Black box</option>
           <option value="pine">Natural pine</option>
         </select>
@@ -318,7 +336,8 @@ function GalleryArtwork({
   }, [photo.src, frameStyle]);
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <button className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
-    <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'}`} style={mountStyle}>
+    <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
+      {frameStyle === 'ornate' && <OrnateFrameWork/>}
       <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
     </span>
     <small>{photo.caption || 'Untitled'}</small>
@@ -576,7 +595,7 @@ export default function Page() {
       });
       if (!response.ok) throw Error(await response.text() || 'Could not save frame');
       await load();
-      const frameName = style ? ({ white: 'Gallery white', mahogany: 'Carved mahogany', black: 'Black box', pine: 'Natural pine' } as const)[style] : 'No frame';
+      const frameName = style ? ({ white: 'Gallery white', mahogany: 'Textured oak', ornate: 'Ornate mahogany', black: 'Black box', pine: 'Natural pine' } as const)[style] : 'No frame';
       setStatus(`${frameName} saved for this photograph.`);
       return true;
     } catch (cause) {
@@ -669,7 +688,7 @@ export default function Page() {
   const viewerFrameStyle: FrameStyle = viewer
     ? photoFrames.find(frame => frame.postId === viewer.post.id && frame.key === viewer.key)?.style || ''
     : '';
-  useEffect(() => setViewerMountColour(''), [viewer?.key]);
+  useEffect(() => setViewerMountColour(''), [viewer?.key, viewerFrameStyle]);
   const viewerMountStyle = viewerMountColour ? ({ [viewerFrameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: viewerMountColour } as CSSProperties) : undefined;
   const galleryItems = galleryPhotos.flatMap((photo, slot) => {
     if (!photo) return [];
@@ -819,7 +838,8 @@ export default function Page() {
     {viewer && viewerIndex !== null && <div className="lightbox" role="dialog" aria-modal="true" aria-label="Full-screen photo viewer">
       <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
       <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
-      <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''}`} style={viewerMountStyle}>
+      <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''} ${viewerFrameStyle === 'ornate' ? `frame-variant-${frameVariant(viewer.post.id)}` : ''}`.trim()} style={viewerMountStyle}>
+        {viewerFrameStyle === 'ornate' && <OrnateFrameWork/>}
         <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget, viewerFrameStyle === 'pine' ? 'pine' : 'mahogany'))}/></div>
       </div>
       <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
