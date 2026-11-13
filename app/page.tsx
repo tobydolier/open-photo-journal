@@ -735,6 +735,7 @@ export default function Page() {
             ? <button aria-label="Sign out" onClick={logout}><LogOut size={16}/></button>
             : <Check size={16}/>}
         </div>
+        {!config.isAdmin && config.passwordLoginEnabled && <button className="sidebar-owner-login" onClick={() => setModal('login')}><LogIn size={14}/>Owner sign in</button>}
       </div>
     </aside>
 
@@ -799,7 +800,6 @@ export default function Page() {
         {config.siteName}
         <span>
           Powered by Open Photo Journal
-          {!config.isAdmin && config.passwordLoginEnabled && <button className="ownerlogin" onClick={() => setModal('login')}><LogIn size={11}/>Owner sign in</button>}
         </span>
       </footer>
     </main>

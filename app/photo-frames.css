@@ -92,18 +92,35 @@
   .photo-frame-mahogany .photo-open,.lightbox-frame-mahogany .lightbox-mount{border-width:3px}
 }
 
-/* A simple natural pine moulding, with restrained grain and two knots. */
+/* A simple natural pine moulding. Grain follows each piece of timber: across
+   the rails and down the stiles, with broad irregular variations rather than
+   a regular stripe pattern. */
 .photo-frame-pine,.lightbox-frame-pine,.gallery-frame.photo-frame-pine{
+  position:relative;
+  isolation:isolate;
   padding:15px;
   border:2px solid #9c6c35;
   background:
-    radial-gradient(ellipse at 16% 32%,#7e4e20 0 2px,#c9924e 3px 7px,transparent 8px),
-    radial-gradient(ellipse at 81% 69%,#855124 0 2px,#d2a05d 3px 8px,transparent 9px),
-    repeating-linear-gradient(4deg,#deb276 0 3px,#c99654 4px,#e8bf83 7px,#b87e3f 9px,#deb276 13px);
+    radial-gradient(ellipse at 13% 26%,#895a2b99 0 1px,#c8945570 2px 5px,transparent 7px),
+    radial-gradient(ellipse at 84% 73%,#8d5b2c80 0 1px,#d1a36a55 2px 6px,transparent 8px),
+    linear-gradient(135deg,#dfb77d,#c99353 48%,#e2b97d);
   box-shadow:0 7px 16px #4d321d2b,inset 0 0 0 2px #f2d39c,inset 0 0 0 5px #a96f33;
 }
+.photo-frame-pine::before,.lightbox-frame-pine::before,.gallery-frame.photo-frame-pine::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  opacity:.38;
+  background:
+    linear-gradient(90deg,transparent 0 9%,#7f51272b 16%,transparent 24%,#fff2c52e 42%,transparent 51%,#8b582629 69%,transparent 82%,#fff0bf24) left/15px 100% no-repeat,
+    linear-gradient(90deg,#fff0bd20,transparent 12%,#8151272b 31%,transparent 47%,#f8d8a122 64%,transparent 77%,#83512825) right/15px 100% no-repeat,
+    linear-gradient(0deg,transparent 0 10%,#7e4e2528 19%,transparent 28%,#fff0c324 46%,transparent 57%,#86532625 76%,transparent 90%) top/100% 15px no-repeat,
+    linear-gradient(0deg,#85532820,transparent 14%,#f5d59e22 33%,transparent 49%,#7c4a2228 67%,transparent 81%,#f2d09820) bottom/100% 15px no-repeat;
+}
 .photo-frame-pine .photo-open,.lightbox-frame-pine .lightbox-mount{
-  padding:5%;border:2px solid #8e5e2e;background:var(--pine-mount,#f4eedf);box-shadow:inset 0 0 0 1px #fff8e8;transition:background-color .35s ease;
+  position:relative;z-index:2;padding:5%;border:2px solid #8e5e2e;background:var(--pine-mount,#f4eedf);box-shadow:inset 0 0 0 1px #fff8e8;transition:background-color .35s ease;
 }
 .lightbox-frame-pine .lightbox-mount{padding:clamp(15px,3.5vw,46px)}
 @media(min-width:1100px){.photo-frame-pine{--frame-outset:46px}}
