@@ -158,7 +158,7 @@ function ProfileAvatar({ config, size = '' }: { config: PublicSiteConfig; size?:
   </div>;
 }
 
-function mutedDominantColour(image: HTMLImageElement) {
+function mutedDominantColour(image: HTMLImageElement, frame: 'mahogany' | 'pine' = 'mahogany') {
   try {
     const size = 40;
     const canvas = document.createElement('canvas');
@@ -215,9 +215,13 @@ function mutedDominantColour(image: HTMLImageElement) {
       hue = (hue * 60 + 360) % 360;
     }
     const mutedSaturation = colourful.length
-      ? Math.round(Math.min(36, Math.max(18, dominant.saturation * 55)))
+      ? frame === 'pine'
+        ? Math.round(Math.min(16, Math.max(7, dominant.saturation * 24)))
+        : Math.round(Math.min(36, Math.max(18, dominant.saturation * 55)))
       : 0;
-    const mountLightness = Math.round(Math.min(84, Math.max(70, dominant.lightness * 100 + 25)));
+    const mountLightness = frame === 'pine'
+      ? Math.round(Math.min(91, Math.max(82, dominant.lightness * 100 + 38)))
+      : Math.round(Math.min(84, Math.max(70, dominant.lightness * 100 + 25)));
     return `hsl(${Math.round(hue)} ${mutedSaturation}% ${mountLightness}%)`;
   } catch {
     return '';
@@ -243,18 +247,18 @@ function Photo({
   const [mountColour, setMountColour] = useState('');
   const imageElement = useRef<HTMLImageElement>(null);
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
+  const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
   useEffect(() => {
     setMountColour('');
     const image = imageElement.current;
-    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image));
-  }, [src]);
-  const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
+    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image, frameStyle === 'pine' ? 'pine' : 'mahogany'));
+  }, [src, frameStyle]);
   const gallerySlot = galleryPhotos.findIndex(photo => photo?.postId === post.id && photo.key === post.media[index]);
-  const mountStyle = mountColour ? ({ '--mahogany-mount': mountColour } as CSSProperties) : undefined;
+  const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
     <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''}`} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
-      <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget))}/>
+      <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
     </button>
     {post.media.length > 1 && <>
@@ -293,6 +297,32 @@ function Photo({
       </label>
     </div>}
   </div>;
+}
+
+function GalleryArtwork({
+  photo, post, mediaIndex, frameStyle, slot, onOpen,
+}: {
+  photo: FeaturedPhoto;
+  post: Post;
+  mediaIndex: number;
+  frameStyle: FrameStyle;
+  slot: number;
+  onOpen: (post: Post, mediaIndex: number) => void;
+}) {
+  const [mountColour, setMountColour] = useState('');
+  const imageElement = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    setMountColour('');
+    const image = imageElement.current;
+    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image, frameStyle === 'pine' ? 'pine' : 'mahogany'));
+  }, [photo.src, frameStyle]);
+  const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
+  return <button className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
+    <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'}`} style={mountStyle}>
+      <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
+    </span>
+    <small>{photo.caption || 'Untitled'}</small>
+  </button>;
 }
 
 export default function Page() {
@@ -640,7 +670,7 @@ export default function Page() {
     ? photoFrames.find(frame => frame.postId === viewer.post.id && frame.key === viewer.key)?.style || ''
     : '';
   useEffect(() => setViewerMountColour(''), [viewer?.key]);
-  const viewerMountStyle = viewerMountColour ? ({ '--mahogany-mount': viewerMountColour } as CSSProperties) : undefined;
+  const viewerMountStyle = viewerMountColour ? ({ [viewerFrameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: viewerMountColour } as CSSProperties) : undefined;
   const galleryItems = galleryPhotos.flatMap((photo, slot) => {
     if (!photo) return [];
     const post = posts.find(item => item.id === photo.postId);
@@ -741,12 +771,7 @@ export default function Page() {
       {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
         <div className="gallery-wall">
           {galleryItems.length ? galleryItems.map(({photo,post,mediaIndex,frameStyle,slot}) =>
-            <button key={slot} className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => openPhoto(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
-              <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'}`}>
-                <span className="photo-open gallery-mount"><img src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async"/></span>
-              </span>
-              <small>{photo.caption || 'Untitled'}</small>
-            </button>)
+            <GalleryArtwork key={slot} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto}/>)
           : <div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Choose up to nine photographs using the Gallery placement control beneath any post.' : 'No photographs have been hung here yet.'}</p></div>}
         </div>
       </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
@@ -795,7 +820,7 @@ export default function Page() {
       <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
       <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
       <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''}`} style={viewerMountStyle}>
-        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget))}/></div>
+        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget, viewerFrameStyle === 'pine' ? 'pine' : 'mahogany'))}/></div>
       </div>
       <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
       <div className="lightbox-caption"><b>{viewer.post.caption || 'A moment worth keeping.'}</b><span>{dateFormat(viewer.post.date)} · {viewerIndex + 1} of {photoItems.length}</span></div>
