@@ -245,7 +245,7 @@ function Photo({
   galleryPhotos: Array<FeaturedPhoto | null>;
   onOpen: (post: Post, mediaIndex: number) => void;
   onFrame: (post: Post, mediaKey: string, style: FrameStyle) => Promise<boolean>;
-  onGallery: (post: Post, mediaKey: string, slot: number) => Promise<void>;
+  onGallery: (post: Post, mediaKey: string) => Promise<void>;
   onRemoveFromGallery: (slot: number) => Promise<void>;
 }) {
   const [index, setIndex] = useState(0);
@@ -293,22 +293,15 @@ function Photo({
           <option value="pine">Natural pine</option>
         </select>
       </label>
-      <label className="feature-photo-control landing-feature-control">Gallery placement
-        <select key={`gallery:${post.id}:${index}:${gallerySlot}`} value={gallerySlot < 0 ? '' : String(gallerySlot)} aria-label="Choose gallery position" onChange={event => {
-          if(event.target.value === 'remove') void onRemoveFromGallery(gallerySlot);
-          else if(event.target.value !== '') void onGallery(post,post.media[index],Number(event.target.value));
-        }}>
-          <option value="">Not in gallery</option>
-          {Array.from({length:9},(_,slot)=><option key={slot} value={slot}>Position {slot + 1}</option>)}
-          {gallerySlot >= 0 && <option value="remove">Remove from gallery</option>}
-        </select>
-      </label>
+      {gallerySlot >= 0
+        ? <button className="feature-photo-control gallery-membership gallery-membership-on" type="button" onClick={() => void onRemoveFromGallery(gallerySlot)}><Images size={15}/> In gallery <span>Remove</span></button>
+        : <button className="feature-photo-control gallery-membership" type="button" onClick={() => void onGallery(post,post.media[index])}><Images size={15}/> Add to gallery</button>}
     </div>}
   </div>;
 }
 
 function GalleryArtwork({
-  photo, post, mediaIndex, frameStyle, slot, onOpen,
+  photo, post, mediaIndex, frameStyle, slot, onOpen, arranging, canMoveEarlier, canMoveLater, onMove,
 }: {
   photo: FeaturedPhoto;
   post: Post;
@@ -316,6 +309,10 @@ function GalleryArtwork({
   frameStyle: FrameStyle;
   slot: number;
   onOpen: (post: Post, mediaIndex: number) => void;
+  arranging: boolean;
+  canMoveEarlier: boolean;
+  canMoveLater: boolean;
+  onMove: (change: number) => void;
 }) {
   const [mountColour, setMountColour] = useState('');
   const imageElement = useRef<HTMLImageElement>(null);
@@ -325,12 +322,19 @@ function GalleryArtwork({
     if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image, frameStyle === 'pine' ? 'pine' : 'mahogany'));
   }, [photo.src, frameStyle]);
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
-  return <button className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
-    <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
-      <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
-    </span>
-    <small>{photo.caption || 'Untitled'}</small>
-  </button>;
+  return <div className={`gallery-artwork gallery-position-${slot + 1} ${arranging ? 'gallery-artwork-arranging' : ''}`}>
+    <button className="gallery-artwork-open" onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
+      <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
+        <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
+      </span>
+      <small>{photo.caption || 'Untitled'}</small>
+    </button>
+    {arranging && <div className="gallery-order-controls" aria-label="Reorder gallery photograph">
+      <button type="button" disabled={!canMoveEarlier} onClick={() => onMove(-1)} aria-label="Move photograph earlier"><ChevronLeft size={16}/></button>
+      <span>{slot + 1}</span>
+      <button type="button" disabled={!canMoveLater} onClick={() => onMove(1)} aria-label="Move photograph later"><ChevronRight size={16}/></button>
+    </div>}
+  </div>;
 }
 
 export default function Page() {
@@ -348,6 +352,8 @@ export default function Page() {
   const [error, setError] = useState('');
   const [photoFrames, setPhotoFrames] = useState<PhotoFrame[]>([]);
   const [galleryPhotos, setGalleryPhotos] = useState<Array<FeaturedPhoto | null>>(() => Array(9).fill(null));
+  const [pendingGalleryPhoto, setPendingGalleryPhoto] = useState<{post: Post; mediaKey: string} | null>(null);
+  const [arrangingGallery, setArrangingGallery] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
@@ -596,7 +602,7 @@ export default function Page() {
   }
 
   async function placeInGallery(post:Post, mediaKey:string, slot:number) {
-    if(!config.isAdmin || busy)return;
+    if(!config.isAdmin || busy)return false;
     setBusy(true);
     try {
       const response=await fetch('/api/landing-photos',{
@@ -605,7 +611,44 @@ export default function Page() {
       });
       if(!response.ok)throw Error(await response.text());
       await load();
-      setStatus(`Photograph placed in gallery position ${slot + 1}.`);
+      setStatus('Photograph added to the gallery.');
+      return true;
+    }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));return false;}
+    finally{setBusy(false);}
+  }
+
+  async function addToGallery(post:Post, mediaKey:string) {
+    if(!config.isAdmin || busy)return;
+    const emptySlot=galleryPhotos.findIndex(photo=>!photo);
+    if(emptySlot>=0){
+      await placeInGallery(post,mediaKey,emptySlot);
+      return;
+    }
+    setPendingGalleryPhoto({post,mediaKey});
+  }
+
+  async function replaceGalleryPhoto(slot:number) {
+    if(!pendingGalleryPhoto)return;
+    const saved=await placeInGallery(pendingGalleryPhoto.post,pendingGalleryPhoto.mediaKey,slot);
+    if(saved)setPendingGalleryPhoto(null);
+  }
+
+  async function moveGalleryPhoto(slot:number,change:number) {
+    if(!config.isAdmin || busy)return;
+    const ordered=galleryPhotos.filter((photo):photo is FeaturedPhoto=>Boolean(photo));
+    const current=ordered.findIndex(photo=>photo.slot===slot);
+    const destination=current+change;
+    if(current<0||destination<0||destination>=ordered.length)return;
+    [ordered[current],ordered[destination]]=[ordered[destination],ordered[current]];
+    setBusy(true);
+    try{
+      const response=await fetch('/api/landing-photos',{
+        method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({items:ordered.map(photo=>({postId:photo.postId,mediaKey:photo.key}))}),
+      });
+      if(!response.ok)throw Error(await response.text());
+      await load();
+      setStatus('Gallery order saved.');
     }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
     finally{setBusy(false);}
   }
@@ -710,7 +753,7 @@ export default function Page() {
       <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
-    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} galleryPhotos={galleryPhotos} onOpen={openPhoto} onFrame={setPhotoFrame} onGallery={placeInGallery} onRemoveFromGallery={removeFromGallery}/>
+    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} galleryPhotos={galleryPhotos} onOpen={openPhoto} onFrame={setPhotoFrame} onGallery={addToGallery} onRemoveFromGallery={removeFromGallery}/>
     <div className="postbody">
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
@@ -792,14 +835,20 @@ export default function Page() {
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
       {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
+        {config.isAdmin && galleryItems.length > 1 && <div className="gallery-toolbar">
+          <button className={arrangingGallery ? 'gallery-arrange-toggle on' : 'gallery-arrange-toggle'} type="button" aria-pressed={arrangingGallery} onClick={()=>setArrangingGallery(value=>!value)}>{arrangingGallery ? 'Done arranging' : 'Arrange gallery'}</button>
+          {arrangingGallery && <span>Use the arrows beneath each photograph to change its position.</span>}
+        </div>}
         <div className="gallery-room">
           <div className="gallery-walk" aria-label="Gallery walls">
           {galleryItems.length ? Array.from({ length: Math.ceil(galleryItems.length / 3) }, (_, wall) =>
             <div className="gallery-wall" key={wall} aria-label={`Gallery wall ${wall + 1}`}>
-              {galleryItems.slice(wall * 3, wall * 3 + 3).map(({photo,post,mediaIndex,frameStyle,slot}) =>
-                <GalleryArtwork key={slot} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto}/>) }
+              {galleryItems.slice(wall * 3, wall * 3 + 3).map(({photo,post,mediaIndex,frameStyle,slot},wallIndex) => {
+                const galleryIndex=wall*3+wallIndex;
+                return <GalleryArtwork key={`${photo.postId}:${photo.key}`} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto} arranging={arrangingGallery} canMoveEarlier={galleryIndex>0} canMoveLater={galleryIndex<galleryItems.length-1} onMove={change=>void moveGalleryPhoto(slot,change)}/>;
+              }) }
             </div>)
-          : <div className="gallery-wall gallery-wall-empty"><div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Choose up to nine photographs using the Gallery placement control beneath any post.' : 'No photographs have been hung here yet.'}</p></div></div>}
+          : <div className="gallery-wall gallery-wall-empty"><div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Add up to nine photographs using the gallery control beneath any post.' : 'No photographs have been hung here yet.'}</p></div></div>}
           </div>
         </div>
         {galleryItems.length > 3 && <p className="gallery-guide">Swipe or scroll sideways to walk through the gallery</p>}
@@ -917,6 +966,22 @@ export default function Page() {
                 <button className="primary wide" disabled={busy || !password} onClick={login}>{busy ? 'Checking…' : 'Sign in'}</button>
               </>}
         {status && <p className="notice" role="status">{status}</p>}
+      </div>
+    </div>}
+
+    {pendingGalleryPhoto && <div className="overlay" role="dialog" aria-modal="true" aria-label="Choose a gallery photograph to replace">
+      <div className="dialog gallery-replacement-dialog">
+        <button className="close" disabled={busy} aria-label="Close" onClick={()=>setPendingGalleryPhoto(null)}><X/></button>
+        <span className="eyebrow">GALLERY FULL</span>
+        <h2>Which photograph should this replace?</h2>
+        <p>Your gallery can hold nine photographs. Tap one of the small previews below to replace it; the others will stay exactly where they are.</p>
+        <div className="gallery-replacement-grid">
+          {galleryPhotos.flatMap((photo,slot)=>photo ? [<button type="button" key={`${photo.postId}:${photo.key}`} disabled={busy} onClick={()=>void replaceGalleryPhoto(slot)} aria-label={`Replace gallery photograph ${slot+1}${photo.caption ? `: ${photo.caption}` : ''}`}>
+            <img src={photo.src} alt=""/>
+            <span>{slot+1}</span>
+          </button>] : [])}
+        </div>
+        <button className="wide" type="button" disabled={busy} onClick={()=>setPendingGalleryPhoto(null)}>Keep the current gallery</button>
       </div>
     </div>}
   </>;

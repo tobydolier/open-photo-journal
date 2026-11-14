@@ -54,6 +54,42 @@ export async function PUT(request:Request) {
   }catch{return error("Couldn't save the gallery selection. Check the featured-photos migration.",503);}
 }
 
+export async function PATCH(request:Request) {
+  if(!(await isAdminRequest(request.headers)))return error("Owner access required",401);
+  if(request.headers.get("origin")!==new URL(request.url).origin)return error("Forbidden",403);
+  if(request.headers.get("content-type")?.split(";")[0]?.trim()!=="application/json")return error("Invalid content type",415);
+  let body:unknown;
+  try {body=await request.json();}catch{return error("Invalid request",400);}
+  const items=(body as {items?:unknown})?.items;
+  if(!Array.isArray(items)||items.length>9)return error("Invalid gallery order",400);
+  const parsed:{postId:string;mediaKey:string}[]=[];
+  const seen=new Set<string>();
+  for(const item of items){
+    if(!item||typeof item!=="object")return error("Invalid gallery photograph",400);
+    const {postId,mediaKey}=item as {postId:unknown;mediaKey:unknown};
+    if(typeof postId!=="string"||!keyPattern.test(postId)||typeof mediaKey!=="string"||!keyPattern.test(mediaKey))return error("Invalid gallery photograph",400);
+    const identity=`${postId}:${mediaKey}`;
+    if(seen.has(identity))return error("A photograph can only appear once",400);
+    seen.add(identity);
+    parsed.push({postId,mediaKey});
+  }
+  const db=env.DB;
+  if(!db)return error("Database unavailable",503);
+  try{
+    for(const item of parsed){
+      const row=await db.prepare("SELECT media FROM posts WHERE id=?").bind(item.postId).first<{media:string}>();
+      if(!row)return error("Photo not in your feed",404);
+      const media=JSON.parse(row.media) as unknown;
+      if(!Array.isArray(media)||!media.includes(item.mediaKey))return error("Photo not in that post",400);
+    }
+    await db.batch([
+      db.prepare("DELETE FROM featured_photos"),
+      ...parsed.map((item,slot)=>db.prepare("INSERT INTO featured_photos(slot,post_id,media_key) VALUES(?,?,?)").bind(slot,item.postId,item.mediaKey)),
+    ]);
+    return Response.json({ok:true},{headers});
+  }catch{return error("Couldn't save the gallery order",503);}
+}
+
 export async function DELETE(request:Request) {
   if(!(await isAdminRequest(request.headers)))return error("Owner access required",401);
   if(request.headers.get("origin")!==new URL(request.url).origin)return error("Forbidden",403);
