@@ -22,11 +22,12 @@
 .gallery-frame.photo-frame-white{padding:5px;border-width:1px}
 .gallery-frame.photo-frame-black{padding:6px;border-width:2px}
 .gallery-frame.photo-frame-pine{padding:6px;border-width:1px}
+.gallery-frame.photo-frame-pine .gallery-mount{background:var(--pine-mount,#e5ded0)}
 .gallery-frame.photo-frame-mahogany{padding:7px;border-width:1px;box-shadow:inset 0 0 0 2px #dfbd84,inset 0 0 0 4px #62402a}
 .gallery-frame.photo-frame-mahogany::before,.gallery-frame.photo-frame-mahogany::after{display:none}
-.gallery-frame.photo-frame-mahogany .gallery-mount{border-width:1px;box-shadow:inset 0 0 0 1px #f3dfb4}
+.gallery-frame.photo-frame-mahogany .gallery-mount{border-width:1px;background:var(--mahogany-mount,#eee1cc);box-shadow:inset 0 0 0 1px #f3dfb4}
 .gallery-frame.photo-frame-ornate{--ornate-edge:10px}
-.gallery-frame.photo-frame-ornate .gallery-mount{padding:3%;border-width:1px;box-shadow:inset 0 0 0 1px #eee1cb}
+.gallery-frame.photo-frame-ornate .gallery-mount{padding:3%;border-width:1px;background:var(--mahogany-mount,#d3c8b6);box-shadow:inset 0 0 0 1px #eee1cb}
 .gallery-empty{grid-column:1/-1;align-self:center;text-align:center;color:#756a5e}.gallery-empty svg{color:#9b8065}.gallery-empty h2{margin:16px 0 8px}.gallery-empty p{max-width:430px;margin:auto;font-size:12px;line-height:1.7}.gallery-wall-empty{display:grid;place-items:center}.gallery-guide{text-align:center;margin:12px 0 0;color:#8a7e71;font-size:10px;letter-spacing:.04em}
 .gallery-replacement-dialog{max-width:590px}.gallery-replacement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0}.gallery-replacement-grid button{position:relative;aspect-ratio:1;overflow:hidden;padding:0;border:2px solid transparent;border-radius:8px;background:#e6e0d7}.gallery-replacement-grid button:hover,.gallery-replacement-grid button:focus-visible{border-color:#8c745d}.gallery-replacement-grid img{display:block;width:100%;height:100%;object-fit:cover}.gallery-replacement-grid span{position:absolute;right:6px;bottom:6px;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:#201b17c9;color:#fff;font-size:10px;font-weight:700}
 @media(max-width:760px){

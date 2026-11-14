@@ -142,12 +142,24 @@ async function archiveId(paths: string[]) {
 }
 
 async function compress(file: File) {
+  const isHeic = /(?:image\/hei[cf]|\.hei[cf]$)/i.test(file.type || file.name);
+  let readableFile: Blob = file;
+  if (isHeic) {
+    try {
+      const { default: heic2any } = await import('heic2any');
+      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+      readableFile = Array.isArray(converted) ? converted[0] : converted;
+    } catch {
+      throw Error('This iPhone photo could not be converted. Please try it again or share it as a JPEG.');
+    }
+  }
   let source:ImageBitmap|HTMLImageElement;
   let objectUrl='';
   try{
-    source=await createImageBitmap(file);
+    if (typeof createImageBitmap !== 'function') throw Error('ImageBitmap unavailable');
+    source=await createImageBitmap(readableFile);
   }catch{
-    objectUrl=URL.createObjectURL(file);
+    objectUrl=URL.createObjectURL(readableFile);
     source=await new Promise<HTMLImageElement>((resolve,reject)=>{
       const image=new Image();
       image.onload=()=>resolve(image);
@@ -155,14 +167,15 @@ async function compress(file: File) {
       image.src=objectUrl;
     });
   }
-  const width=source instanceof ImageBitmap?source.width:source.naturalWidth;
-  const height=source instanceof ImageBitmap?source.height:source.naturalHeight;
+  const bitmap = typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap;
+  const width=bitmap?source.width:source.naturalWidth;
+  const height=bitmap?source.height:source.naturalHeight;
   const scale = Math.min(1, 1600 / Math.max(width, height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
   canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height);
-  if(source instanceof ImageBitmap)source.close();
+  if(bitmap)source.close();
   if(objectUrl)URL.revokeObjectURL(objectUrl);
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -371,7 +384,12 @@ function Photo({
         <select key={`style:${post.id}:${index}`} value={frameStyle} disabled={savingFrame} aria-label="Choose photo frame" onChange={async event => {
           setSavingFrame(true);
           setFrameError(false);
-          const saved = await onFrame(post, post.media[index], event.target.value as FrameStyle, mountColour);
+          const nextStyle = event.target.value as FrameStyle;
+          const image = imageElement.current;
+          const nextMountColour = image && ['mahogany','ornate','pine'].includes(nextStyle)
+            ? mutedDominantColour(image, nextStyle === 'pine' ? 'pine' : 'mahogany')
+            : '';
+          const saved = await onFrame(post, post.media[index], nextStyle, nextMountColour);
           setFrameError(!saved);
           setSavingFrame(false);
         }}>
@@ -1102,7 +1120,7 @@ export default function Page() {
                 <ImagePlus size={30}/>
                 <b>{files.length ? `${files.length} photos selected` : 'Choose your photos'}</b>
                 <small>iPhone Photos, JPEG, PNG or WebP · up to 20 per post</small>
-                <input type="file" accept="image/*,.heic,.heif" multiple disabled={busy} onChange={event => setFiles(Array.from(event.target.files || []).slice(0, 20))}/>
+                <input type="file" accept="image/*" multiple disabled={busy} onChange={event => setFiles(Array.from(event.target.files || []).slice(0, 20))}/>
               </label>
               <label className="field">Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder="What’s the story?"/></label>
               <label className="field">Date<input type="date" value={date} onChange={event => setDate(event.target.value)}/></label>
@@ -1140,7 +1158,7 @@ export default function Page() {
                     <ProfileAvatar config={config} size="large"/>
                     <b>{profilePhoto ? 'Choose a different photo' : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
                     <small>JPEG, PNG or WebP · you can crop and zoom before saving</small>
-                    <input type="file" accept="image/*,.heic,.heif" disabled={busy} onChange={event => chooseProfilePhoto(event.target.files?.[0] || null)}/>
+                    <input type="file" accept="image/*" disabled={busy} onChange={event => chooseProfilePhoto(event.target.files?.[0] || null)}/>
                   </label>
                   {profilePhoto && profilePreview && <div className="profile-cropper">
                     <div className="profile-crop-window" onPointerDown={event=>{

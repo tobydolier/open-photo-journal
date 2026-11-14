@@ -18,7 +18,7 @@ Lightroom, or wherever the owner already keeps them.
 - Permanent `/p/:id` post pages with Open Graph and Bluesky-ready metadata
 - Owner-only create, delete, favourite, optional-location, and archive-import controls
 - HTML and JSON Instagram export import, with duplicate detection and resume
-- Browser-side WebP resizing and re-encoding, which removes embedded EXIF/GPS
+- Browser-side HEIC/HEIF conversion plus WebP resizing and re-encoding, which removes embedded EXIF/GPS
 - Configurable name, profile, locale, storage ceiling, and canonical URL
 - ChatGPT Sites or Cloudflare Access identity, with optional password login
 - D1 schema and migrations, R2 media storage, per-photo frame styles, full-screen viewing, and an MIT licence
