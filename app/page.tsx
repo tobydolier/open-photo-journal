@@ -83,6 +83,7 @@ function editableProfile(config: PublicSiteConfig): EditableProfile {
 
 const imageFile = /\.(?:jpe?g|png|webp)$/i;
 const postBatchSize = 24;
+const profileCropSize = 260;
 
 function cleanPath(path: string) {
   return path.replace(/\\/g, '/').replace(/^(?:\.\.\/|\.\/)+/, '').replace(/^\/+/, '');
@@ -148,6 +149,27 @@ async function compress(file: File) {
       'image/webp',
       0.84,
     );
+  });
+}
+
+async function cropProfileImage(file: File, zoom: number, offset: {x:number;y:number}) {
+  const bitmap = await createImageBitmap(file);
+  const baseScale = Math.max(profileCropSize / bitmap.width, profileCropSize / bitmap.height);
+  const scale = baseScale * zoom;
+  const renderedWidth = bitmap.width * scale;
+  const renderedHeight = bitmap.height * scale;
+  const left = (profileCropSize - renderedWidth) / 2 + offset.x;
+  const top = (profileCropSize - renderedHeight) / 2 + offset.y;
+  const sourceSize = profileCropSize / scale;
+  const sourceX = Math.max(0, Math.min(bitmap.width - sourceSize, -left / scale));
+  const sourceY = Math.max(0, Math.min(bitmap.height - sourceSize, -top / scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = 800;
+  canvas.height = 800;
+  canvas.getContext('2d')!.drawImage(bitmap, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 800, 800);
+  bitmap.close();
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(Error('Could not crop profile photo')), 'image/webp', 0.88);
   });
 }
 
@@ -360,9 +382,14 @@ export default function Page() {
   const [visibleCount, setVisibleCount] = useState(postBatchSize);
   const [profileDraft, setProfileDraft] = useState<EditableProfile>(() => editableProfile(defaultConfig));
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState('');
+  const [profileDimensions, setProfileDimensions] = useState({width:0,height:0});
+  const [profileZoom, setProfileZoom] = useState(1);
+  const [profileOffset, setProfileOffset] = useState({x:0,y:0});
   const folder = useRef<HTMLInputElement>(null);
   const archiveFiles = useRef<HTMLInputElement>(null);
   const feedEnd = useRef<HTMLDivElement>(null);
+  const profileDrag = useRef<{pointerId:number;startX:number;startY:number;x:number;y:number} | null>(null);
 
   async function load() {
     const [postsResponse, configResponse, framesResponse, galleryResponse] = await Promise.all([
@@ -388,6 +415,36 @@ export default function Page() {
   useEffect(() => {
     load().catch(cause => setError(cause instanceof Error ? cause.message : String(cause)));
   }, []);
+
+  useEffect(() => {
+    if (!profilePhoto) {
+      setProfilePreview('');
+      return;
+    }
+    const url = URL.createObjectURL(profilePhoto);
+    setProfilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profilePhoto]);
+
+  function profileImageSize(zoom=profileZoom,dimensions=profileDimensions) {
+    if (!dimensions.width || !dimensions.height) return {width:profileCropSize,height:profileCropSize};
+    const scale=Math.max(profileCropSize/dimensions.width,profileCropSize/dimensions.height)*zoom;
+    return {width:dimensions.width*scale,height:dimensions.height*scale};
+  }
+
+  function clampProfileOffset(offset:{x:number;y:number},zoom=profileZoom,dimensions=profileDimensions) {
+    const rendered=profileImageSize(zoom,dimensions);
+    const maxX=Math.max(0,(rendered.width-profileCropSize)/2);
+    const maxY=Math.max(0,(rendered.height-profileCropSize)/2);
+    return {x:Math.max(-maxX,Math.min(maxX,offset.x)),y:Math.max(-maxY,Math.min(maxY,offset.y))};
+  }
+
+  function chooseProfilePhoto(file:File|null) {
+    setProfilePhoto(file);
+    setProfileDimensions({width:0,height:0});
+    setProfileZoom(1);
+    setProfileOffset({x:0,y:0});
+  }
 
   async function upload(id: string, postCaption: string, postDate: string, source: string, photos: File[]) {
     const form = new FormData();
@@ -498,7 +555,7 @@ export default function Page() {
 
   function openProfileSettings() {
     setProfileDraft(editableProfile(config));
-    setProfilePhoto(null);
+    chooseProfilePhoto(null);
     setStatus('');
     setModal('settings');
   }
@@ -514,13 +571,13 @@ export default function Page() {
       if (!response.ok) throw Error(await response.text() || 'Could not save profile settings');
       if (profilePhoto) {
         const form = new FormData();
-        form.set('photo', await compress(profilePhoto), 'profile.webp');
+        form.set('photo', await cropProfileImage(profilePhoto, profileZoom, profileOffset), 'profile.webp');
         const photoResponse = await fetch('/api/settings', { method: 'POST', body: form });
         if (!photoResponse.ok) throw Error(await photoResponse.text() || 'Could not save profile photo');
       }
       await load();
       setModal('');
-      setProfilePhoto(null);
+      chooseProfilePhoto(null);
       setStatus('Profile settings saved.');
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : String(cause));
@@ -534,7 +591,7 @@ export default function Page() {
     try {
       const response = await fetch('/api/settings', { method: 'DELETE' });
       if (!response.ok) throw Error(await response.text() || 'Could not remove profile photo');
-      setProfilePhoto(null);
+      chooseProfilePhoto(null);
       await load();
       setStatus('Profile photo removed.');
     } catch (cause) {
@@ -943,10 +1000,38 @@ export default function Page() {
                   <p>Update the identity and introductory copy shown throughout your journal.</p>
                   <label className="drop">
                     <ProfileAvatar config={config} size="large"/>
-                    <b>{profilePhoto ? profilePhoto.name : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
-                    <small>JPEG, PNG or WebP · a square image works best</small>
-                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => setProfilePhoto(event.target.files?.[0] || null)}/>
+                    <b>{profilePhoto ? 'Choose a different photo' : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
+                    <small>JPEG, PNG or WebP · you can crop and zoom before saving</small>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => chooseProfilePhoto(event.target.files?.[0] || null)}/>
                   </label>
+                  {profilePhoto && profilePreview && <div className="profile-cropper">
+                    <div className="profile-crop-window" onPointerDown={event=>{
+                      profileDrag.current={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:profileOffset.x,y:profileOffset.y};
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }} onPointerMove={event=>{
+                      const drag=profileDrag.current;
+                      if(!drag||drag.pointerId!==event.pointerId)return;
+                      setProfileOffset(clampProfileOffset({x:drag.x+event.clientX-drag.startX,y:drag.y+event.clientY-drag.startY}));
+                    }} onPointerUp={event=>{
+                      if(profileDrag.current?.pointerId===event.pointerId)profileDrag.current=null;
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                    }} onPointerCancel={()=>{profileDrag.current=null;}}>
+                      <img src={profilePreview} alt="Profile crop preview" draggable={false} onLoad={event=>{
+                        const dimensions={width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight};
+                        setProfileDimensions(dimensions);
+                        setProfileOffset(current=>clampProfileOffset(current,profileZoom,dimensions));
+                      }} style={{width:profileImageSize().width,height:profileImageSize().height,transform:`translate(-50%, -50%) translate(${profileOffset.x}px, ${profileOffset.y}px)`}}/>
+                      <span>Drag to reposition</span>
+                    </div>
+                    <label className="profile-zoom">Zoom
+                      <input type="range" min="1" max="3" step="0.01" value={profileZoom} onChange={event=>{
+                        const zoom=Number(event.target.value);
+                        setProfileZoom(zoom);
+                        setProfileOffset(current=>clampProfileOffset(current,zoom));
+                      }}/>
+                    </label>
+                    <button type="button" className="profile-crop-reset" onClick={()=>{setProfileZoom(1);setProfileOffset({x:0,y:0});}}>Reset crop</button>
+                  </div>}
                   {config.profileImageUrl && <button className="wide" disabled={busy} onClick={clearProfilePhoto}>Remove current profile photo</button>}
                   <label className="field">Display name<input value={profileDraft.profileName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, profileName: event.target.value})}/></label>
                   <label className="field">Username<input value={profileDraft.profileHandle} maxLength={40} onChange={event => setProfileDraft({...profileDraft, profileHandle: event.target.value.replace(/^@+/, '')})}/></label>
