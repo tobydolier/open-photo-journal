@@ -84,12 +84,12 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
   return <div className="sharepage">
     <main>
       <div className="sharetop">
-        <Link className="wordmark" href="/">
+        <Link className="wordmark" href={origin}>
           {config.wordmarkImageUrl
             ? <img className="wordmark-image" src={config.wordmarkImageUrl} alt={config.siteName}/>
             : <>{config.siteName}<span>•</span></>}
         </Link>
-        <Link className="backlink" href="/">← Back to all posts</Link>
+        <Link className="backlink" href={origin}>← Back to all posts</Link>
       </div>
       <article className="sharecard">
         <div className="sharecardhead">
