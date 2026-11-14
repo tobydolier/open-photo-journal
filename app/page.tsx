@@ -705,6 +705,11 @@ export default function Page() {
     setModal('settings');
   }
 
+  function addPostFiles(selected: File[]) {
+    if (!selected.length) return;
+    setFiles(current => [...current, ...selected].slice(0, 20));
+  }
+
   async function saveProfileSettings() {
     setBusy(true);
     try {
@@ -1132,12 +1137,29 @@ export default function Page() {
               <span className="eyebrow">A NEW MEMORY</span>
               <h2>Create a post</h2>
               <p>Select photos from your device or its Photos picker.</p>
-              <label className="drop">
+              <div className="drop photo-picker">
                 <ImagePlus size={30}/>
-                <b>{files.length ? `${files.length} photos selected` : 'Choose your photos'}</b>
-                <small>iPhone Photos, JPEG, PNG or WebP · up to 20 per post</small>
-                <input type="file" accept="image/*" multiple disabled={busy} onChange={event => setFiles(Array.from(event.target.files || []).slice(0, 20))}/>
-              </label>
+                <b>{files.length ? `${files.length} ${files.length === 1 ? 'photo' : 'photos'} selected` : 'Add photos'}</b>
+                <small>Choose existing photographs or open your device camera.</small>
+                <div className="photo-source-actions">
+                  <label className="photo-source-button">
+                    <Images size={17}/>Choose from Photos
+                    <input type="file" accept="image/*" multiple disabled={busy || files.length >= 20} onChange={event => {
+                      addPostFiles(Array.from(event.target.files || []));
+                      event.currentTarget.value='';
+                    }}/>
+                  </label>
+                  <label className="photo-source-button">
+                    <Camera size={17}/>Take a photo
+                    <input type="file" accept="image/*" capture="environment" disabled={busy || files.length >= 20} onChange={event => {
+                      addPostFiles(Array.from(event.target.files || []));
+                      event.currentTarget.value='';
+                    }}/>
+                  </label>
+                </div>
+                {files.length > 0 && <button type="button" className="clear-photo-selection" disabled={busy} onClick={() => setFiles([])}>Clear selection</button>}
+                <small>JPEG, HEIC, PNG or WebP · up to 20 per post</small>
+              </div>
               <label className="field">Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder="What’s the story?"/></label>
               <label className="field">Date<input type="date" value={date} onChange={event => setDate(event.target.value)}/></label>
               <label className="location-choice"><input type="checkbox" checked={includeLocation} onChange={event=>{
