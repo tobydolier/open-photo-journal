@@ -139,3 +139,28 @@
   .lightbox-photo-frame[class*="lightbox-frame-"] .lightbox-mount{display:grid;place-items:center;width:max-content;height:max-content;max-width:calc(100vw - 96px - var(--lightbox-edge-total));max-height:calc(100dvh - 120px - var(--lightbox-edge-total));padding:var(--lightbox-mount-gap)!important;box-sizing:border-box}
   .lightbox-photo-frame[class*="lightbox-frame-"] .lightbox-mount img{display:block;width:auto;height:auto;max-width:calc(100vw - 96px - var(--lightbox-content-total));max-height:calc(100dvh - 120px - var(--lightbox-content-total));object-fit:contain}
 }
+
+/* Three original, open-source ornate frame assets are assigned deterministically
+   from the post ID. Nine-slice border rendering keeps corners intact while the
+   rails adapt to portrait, landscape and square photographs. */
+.photo-frame-ornate,.lightbox-frame-ornate,.gallery-frame.photo-frame-ornate{
+  --ornate-edge:28px;
+  padding:0;
+  border:var(--ornate-edge) solid transparent;
+  border-image-slice:18% 18% 17% 18%;
+  border-image-width:1.55;
+  border-image-outset:.34;
+  border-image-repeat:stretch;
+  background:transparent;
+  box-shadow:none;
+}
+.photo-frame-ornate.frame-variant-0,.lightbox-frame-ornate.frame-variant-0,.gallery-frame.photo-frame-ornate.frame-variant-0{border-image-source:url('/frames/ornate-museum.webp')}
+.photo-frame-ornate.frame-variant-1,.lightbox-frame-ornate.frame-variant-1,.gallery-frame.photo-frame-ornate.frame-variant-1{border-image-source:url('/frames/ornate-scrollwork.webp')}
+.photo-frame-ornate.frame-variant-2,.lightbox-frame-ornate.frame-variant-2,.gallery-frame.photo-frame-ornate.frame-variant-2{border-image-source:url('/frames/ornate-classical.webp')}
+.photo-frame-ornate .photo-open,.lightbox-frame-ornate .lightbox-mount{border:2px solid #5c321f;box-shadow:0 0 0 1px #c59969,inset 0 0 0 1px #eee1cb}
+@media(min-width:1100px){.photo-frame-ornate{--frame-outset:64px;--ornate-edge:32px}}
+@media(max-width:760px){
+  .photo-frame-ornate,.lightbox-frame-ornate{--ornate-edge:12px}
+  .gallery-frame.photo-frame-ornate{--ornate-edge:8px}
+  .lightbox-frame-ornate{--lightbox-edge-total:24px!important;--lightbox-content-total:52px!important}
+}

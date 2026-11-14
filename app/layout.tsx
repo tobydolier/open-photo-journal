@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./theme.css";
 import "./photo-frames.css";
+import "./gallery-room.css";
 import type { Metadata } from "next";
 import { getPublicSiteConfig } from "../lib/site-config";
 

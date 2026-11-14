@@ -165,16 +165,6 @@ function frameVariant(id: string) {
   return hash % 3;
 }
 
-function OrnateFrameWork() {
-  return <span className="ornate-frame-work" aria-hidden="true">
-    <span className="ornate-wood ornate-top"/>
-    <span className="ornate-wood ornate-right"/>
-    <span className="ornate-wood ornate-bottom"/>
-    <span className="ornate-wood ornate-left"/>
-    {Array.from({ length: 15 }, (_, index) => <span key={index} className={`ornate-flourish ornate-flourish-${index + 1}`}/>) }
-  </span>;
-}
-
 function mutedDominantColour(image: HTMLImageElement, frame: 'mahogany' | 'pine' = 'mahogany') {
   try {
     const size = 40;
@@ -274,7 +264,6 @@ function Photo({
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
     <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
-    {frameStyle === 'ornate' && <OrnateFrameWork/>}
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
       <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
@@ -338,7 +327,6 @@ function GalleryArtwork({
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <button className={`gallery-artwork gallery-position-${slot + 1}`} onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
     <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
-      {frameStyle === 'ornate' && <OrnateFrameWork/>}
       <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
     </span>
     <small>{photo.caption || 'Untitled'}</small>
@@ -804,11 +792,17 @@ export default function Page() {
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
       {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
-        <div className="gallery-wall">
-          {galleryItems.length ? galleryItems.map(({photo,post,mediaIndex,frameStyle,slot}) =>
-            <GalleryArtwork key={slot} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto}/>)
-          : <div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Choose up to nine photographs using the Gallery placement control beneath any post.' : 'No photographs have been hung here yet.'}</p></div>}
+        <div className="gallery-room">
+          <div className="gallery-walk" aria-label="Gallery walls">
+          {galleryItems.length ? Array.from({ length: Math.ceil(galleryItems.length / 3) }, (_, wall) =>
+            <div className="gallery-wall" key={wall} aria-label={`Gallery wall ${wall + 1}`}>
+              {galleryItems.slice(wall * 3, wall * 3 + 3).map(({photo,post,mediaIndex,frameStyle,slot}) =>
+                <GalleryArtwork key={slot} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto}/>) }
+            </div>)
+          : <div className="gallery-wall gallery-wall-empty"><div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Choose up to nine photographs using the Gallery placement control beneath any post.' : 'No photographs have been hung here yet.'}</p></div></div>}
+          </div>
         </div>
+        {galleryItems.length > 3 && <p className="gallery-guide">Swipe or scroll sideways to walk through the gallery</p>}
       </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
         {visible.length
           ? view === 'grid'
@@ -855,7 +849,6 @@ export default function Page() {
       <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
       <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
       <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''} ${viewerFrameStyle === 'ornate' ? `frame-variant-${frameVariant(viewer.post.id)}` : ''}`.trim()} style={viewerMountStyle}>
-        {viewerFrameStyle === 'ornate' && <OrnateFrameWork/>}
         <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget, viewerFrameStyle === 'pine' ? 'pine' : 'mahogany'))}/></div>
       </div>
       <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
