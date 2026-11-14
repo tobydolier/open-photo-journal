@@ -13,6 +13,7 @@ declare namespace Cloudflare {
     VISIBILITY_LABEL?: string;
     STORAGE_LIMIT_BYTES?: string;
     PUBLIC_SITE_URL?: string;
+    SHORT_SITE_URL?: string;
     ADMIN_EMAIL?: string;
     ADMIN_PASSWORD?: string;
     ADMIN_SESSION_SECRET?: string;

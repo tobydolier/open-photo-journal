@@ -47,6 +47,7 @@ file. Public presentation is controlled by environment variables:
 | `VISIBILITY_LABEL` | Profile status text |
 | `STORAGE_LIMIT_BYTES` | Application-level upload safety ceiling |
 | `PUBLIC_SITE_URL` | Canonical production origin used by share cards |
+| `SHORT_SITE_URL` | Optional HTTPS origin for compact permanent post links; attach this hostname to the same Worker |
 | `WORDMARK_IMAGE_URL` | Optional root-relative or HTTPS wordmark/logo image |
 | `PROFILE_IMAGE_URL` | Optional root-relative or HTTPS profile photograph |
 | `FAVICON_URL` | Optional root-relative or HTTPS browser icon |
@@ -102,7 +103,7 @@ and fresh data resources to that installation. Never copy a `project_id` from
 another deployment.
 
 The runtime is Cloudflare-native. Before the first production deployment, apply
-`drizzle/0000_outstanding_viper.sql` through `drizzle/0007_post_locations.sql`
+`drizzle/0000_outstanding_viper.sql` through `drizzle/0008_post_short_links.sql`
 to the production D1 database in numeric order. Configure `ADMIN_PASSWORD`
 and `ADMIN_SESSION_SECRET` as runtime secrets rather than build variables.
 Keep all passwords, account IDs, photographs, and deployment-specific values

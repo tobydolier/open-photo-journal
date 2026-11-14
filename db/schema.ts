@@ -26,3 +26,8 @@ export const photoFrames = sqliteTable("photo_frames", {
   mediaKey: text("media_key").notNull(),
   style: text("style").notNull(),
 });
+export const postShortLinks = sqliteTable("post_short_links", {
+  code: text("code").primaryKey(),
+  postId: text("post_id").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+});

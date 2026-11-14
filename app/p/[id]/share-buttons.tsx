@@ -34,6 +34,6 @@ export default function ShareButtons({url, caption, siteName}: {url: string; cap
       <button type="button" onClick={copyLink}>{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? 'Copied' : 'Copy link'}</button>
       <a className="bluesky" href={blueskyUrl} target="_blank" rel="noreferrer">Share on Bluesky</a>
     </div>
-    <p className="sharehint">The photo preview will appear in Bluesky when this journal is public. Sharing never posts automatically. Bluesky opens a draft for you to confirm.</p>
+    <p className="sharehint">Every option uses this permanent short link: <strong>{url.replace(/^https?:\/\//, '')}</strong>. Sharing never posts automatically; Bluesky opens a draft for you to confirm.</p>
   </>;
 }

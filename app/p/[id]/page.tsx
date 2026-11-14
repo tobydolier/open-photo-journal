@@ -6,6 +6,7 @@ import { env } from 'cloudflare:workers';
 import ShareButtons from './share-buttons';
 import { getPublicSiteConfig } from '../../../lib/site-config';
 import { ensurePostLocationsTable } from '../../../lib/post-locations';
+import { getOrCreateShortCode } from '../../../lib/short-links';
 
 type Post = {id:string;caption:string;date:string;source:string;media:string[];location:{name:string;latitude:number|null;longitude:number|null}|null};
 type PostRow = Omit<Post, 'media'|'location'> & {media:string;location_name:string|null;latitude:number|null;longitude:number|null};
@@ -26,6 +27,19 @@ async function getOrigin() {
   const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || 'localhost').split(',')[0].trim();
   const protocol = (requestHeaders.get('x-forwarded-proto') || 'https').split(',')[0].trim();
   return `${protocol}://${host}`;
+}
+
+async function getShareUrl(postId: string, fallbackUrl: string) {
+  const configured = env.SHORT_SITE_URL?.trim().replace(/\/$/, '');
+  if (!configured || !env.DB) return fallbackUrl;
+  try {
+    const origin = new URL(configured);
+    if (origin.protocol !== 'https:') return fallbackUrl;
+    const code = await getOrCreateShortCode(env.DB, postId);
+    return `${origin.origin}/${code}`;
+  } catch {
+    return fallbackUrl;
+  }
 }
 
 function postDescription(post: Post, siteName: string, locale: string) {
@@ -65,6 +79,7 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
   const config = getPublicSiteConfig();
   const origin = await getOrigin();
   const url = `${origin}/p/${encodeURIComponent(post.id)}`;
+  const shareUrl = await getShareUrl(post.id, url);
   const date = new Date(post.date).toLocaleDateString(config.locale, {day:'numeric', month:'long', year:'numeric'});
   return <div className="sharepage">
     <main>
@@ -92,7 +107,7 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
         <div className="sharecopy">
           <p className="sharecaption">{post.caption || 'A moment worth keeping.'}</p>
           {post.source === 'instagram' && <span className="shareorigin">Previously hosted on Instagram · original posting date preserved</span>}
-          <ShareButtons url={url} caption={post.caption} siteName={config.siteName}/>
+          <ShareButtons url={shareUrl} caption={post.caption} siteName={config.siteName}/>
         </div>
       </article>
     </main>

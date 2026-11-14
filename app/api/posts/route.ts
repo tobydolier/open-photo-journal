@@ -105,6 +105,7 @@ export async function DELETE(request:Request){
     try{await env.DB!.prepare("DELETE FROM featured_photos WHERE post_id=?").bind(id).run();}catch{}
     try{await env.DB!.prepare("DELETE FROM photo_frames WHERE post_id=?").bind(id).run();}catch{}
     try{await env.DB!.prepare("DELETE FROM post_locations WHERE post_id=?").bind(id).run();}catch{}
+    try{await env.DB!.prepare("DELETE FROM post_short_links WHERE post_id=?").bind(id).run();}catch{}
     await env.DB!.prepare("DELETE FROM posts WHERE id=?").bind(id).run();
   }
   return Response.json({ok:true});

@@ -30,7 +30,17 @@ const localBindingConfig = {
         routes: [
           { pattern: "framefeed.co.uk", custom_domain: true },
           { pattern: "toby.framefeed.co.uk", custom_domain: true },
+          { pattern: "frfd.uk", custom_domain: true },
+          { pattern: "www.frfd.uk", custom_domain: true },
         ],
+      }
+    : {}),
+  ...(framefeedDeploy
+    ? {
+        vars: {
+          PUBLIC_SITE_URL: "https://toby.framefeed.co.uk",
+          SHORT_SITE_URL: "https://frfd.uk",
+        },
       }
     : {}),
   main: "./worker/index.ts",
