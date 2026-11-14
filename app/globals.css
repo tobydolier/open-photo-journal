@@ -11,9 +11,11 @@
 
 /* Optional deployment-specific visual branding. */
 .wordmark-image{display:block;max-width:180px;max-height:58px;width:auto;height:auto;object-fit:contain;object-position:left center}
+.wordmark .framefeed-logo,.mobile-wordmark .framefeed-logo{display:inline-flex;align-items:center;gap:9px;margin:0;color:var(--accent-dark);font-family:ui-rounded,"Arial Rounded MT Bold",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:22px;font-style:normal;font-weight:750;letter-spacing:-1px;line-height:1;white-space:nowrap}.framefeed-logo svg{display:block;width:39px;height:36px;overflow:visible}.framefeed-logo svg *{vector-effect:non-scaling-stroke}.logo-frame-back,.logo-frame-front{fill:var(--paper);stroke:currentColor;stroke-width:3.4}.logo-frame-back{opacity:.6}.logo-picture-back,.logo-sun-back{fill:currentColor;opacity:.6}.logo-picture-front,.logo-sun-front{fill:currentColor}.wordmark .framefeed-logo>span,.mobile-wordmark .framefeed-logo>span{margin:0;color:inherit}.mobile-wordmark{display:none;text-decoration:none;width:max-content;margin-bottom:21px}.mobile-wordmark .framefeed-logo-compact{font-size:19px;gap:7px}.framefeed-logo-compact svg{width:33px;height:30px}
+.journal-wording{margin:20px 0 4px;border:1px solid #cbd7ce;border-radius:8px;background:#f7faf6}.journal-wording summary{cursor:pointer;padding:14px 15px;color:var(--accent-dark);font-size:11px;font-weight:700;list-style:none}.journal-wording summary::-webkit-details-marker{display:none}.journal-wording summary::after{content:'+';float:right;font-size:16px;font-weight:400;line-height:10px}.journal-wording[open] summary::after{content:'−'}.journal-wording[open] summary{border-bottom:1px solid #dce5de}.journal-wording>p{margin:14px 15px 2px!important}.journal-wording .field{margin-left:15px;margin-right:15px}.journal-wording .field:last-child{margin-bottom:16px}
 .avatar{overflow:hidden}
 .avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
-@media(max-width:760px){.wordmark-image{max-width:145px;max-height:44px}}
+@media(max-width:760px){.wordmark-image{max-width:145px;max-height:44px}.mobile-wordmark{display:block}}
 
 /* A nine-place profile gallery, built entirely in CSS so the open-source
    template carries no licensed room artwork. */

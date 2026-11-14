@@ -245,6 +245,20 @@ function ProfileAvatar({ config, size = '' }: { config: PublicSiteConfig; size?:
   </div>;
 }
 
+function FrameFeedLogo({ compact = false }: { compact?: boolean }) {
+  return <span className={`framefeed-logo ${compact ? 'framefeed-logo-compact' : ''}`}>
+    <svg viewBox="0 0 48 44" aria-hidden="true">
+      <rect className="logo-frame-back" x="2.5" y="2.5" width="30" height="29" rx="6"/>
+      <path className="logo-picture-back" d="M8 25l6-6 5 5 5-7 5 6v4H8z"/>
+      <circle className="logo-sun-back" cx="24" cy="10" r="2.7"/>
+      <rect className="logo-frame-front" x="14.5" y="11.5" width="30" height="29" rx="6"/>
+      <path className="logo-picture-front" d="M20 34l6-6 5 5 5-7 5 6v4H20z"/>
+      <circle className="logo-sun-front" cx="36" cy="19" r="2.7"/>
+    </svg>
+    <span>framefeed</span>
+  </span>;
+}
+
 function PostLocationLabel({location}:{location:PostLocation|null}) {
   if(!location)return null;
   const label=location.name||'Pinned location';
@@ -976,7 +990,7 @@ export default function Page() {
       <a className="wordmark" href="/">
         {config.wordmarkImageUrl
           ? <img className="wordmark-image" src={config.wordmarkImageUrl} alt={config.siteName}/>
-          : <>{config.siteName}<span>•</span></>}
+          : <FrameFeedLogo/>}
       </a>
       <nav>
         <button className={view === 'feed' ? 'chosen' : ''} onClick={() => { setView('feed'); setViewerIndex(null); }}><Home size={23}/>Home</button>
@@ -985,7 +999,7 @@ export default function Page() {
         {config.isAdmin && <button className={view === 'saved' ? 'chosen' : ''} onClick={() => { setView('saved'); setViewerIndex(null); }}><Heart size={23}/>Favourites</button>}
         {config.isAdmin && <button onClick={() => setModal('create')}><PlusSquare size={23}/>Create</button>}
         {config.isAdmin && <button onClick={() => setModal('import')}><Download size={23}/>Import Instagram</button>}
-        {config.isAdmin && <button onClick={openProfileSettings}><Settings size={23}/>Profile settings</button>}
+        {config.isAdmin && <button onClick={openProfileSettings}><Settings size={23}/>Edit profile</button>}
       </nav>
       <div className="asidebottom">
         <div className="privacy"><Lock size={15}/><div><b>{config.visibilityLabel}</b><small>{config.siteDescription}</small></div></div>
@@ -1006,6 +1020,7 @@ export default function Page() {
     </aside>
 
     <main>
+      <a className="mobile-wordmark" href="/" aria-label="FrameFeed home"><FrameFeedLogo compact/></a>
       <header>
         <div><span className="eyebrow">{config.eyebrow}</span><h1>{view === 'grid' ? 'Photos' : view === 'gallery' ? 'The gallery' : view === 'saved' ? 'Favourites' : 'Moments, all together.'}</h1></div>
         {config.isAdmin && <button className="primary" onClick={() => setModal('create')}><PlusSquare size={17}/> New post</button>}
@@ -1152,9 +1167,9 @@ export default function Page() {
               </>
               : modal === 'settings'
                 ? <>
-                  <span className="eyebrow">MAKE IT YOURS</span>
-                  <h2>Profile settings</h2>
-                  <p>Update the identity and introductory copy shown throughout your journal.</p>
+                  <span className="eyebrow">YOUR PROFILE</span>
+                  <h2>Edit profile</h2>
+                  <p>Update how you appear throughout your journal.</p>
                   <label className="drop">
                     <ProfileAvatar config={config} size="large"/>
                     <b>{profilePhoto ? 'Choose a different photo' : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
@@ -1190,15 +1205,18 @@ export default function Page() {
                     <button type="button" className="profile-crop-reset" onClick={()=>{setProfileZoom(1);setProfileOffset({x:0,y:0});}}>Reset crop</button>
                   </div>}
                   {config.profileImageUrl && <button className="wide" disabled={busy} onClick={clearProfilePhoto}>Remove current profile photo</button>}
-                  <label className="field">Display name<input value={profileDraft.profileName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, profileName: event.target.value})}/></label>
+                  <label className="field">Name<input value={profileDraft.profileName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, profileName: event.target.value})}/></label>
                   <label className="field">Username<input value={profileDraft.profileHandle} maxLength={40} onChange={event => setProfileDraft({...profileDraft, profileHandle: event.target.value.replace(/^@+/, '')})}/></label>
                   <label className="field">Bio<textarea value={profileDraft.profileBio} maxLength={240} onChange={event => setProfileDraft({...profileDraft, profileBio: event.target.value})}/></label>
-                  <label className="field">Journal name<input value={profileDraft.siteName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, siteName: event.target.value})}/></label>
-                  <label className="field">Header label<input value={profileDraft.eyebrow} maxLength={80} onChange={event => setProfileDraft({...profileDraft, eyebrow: event.target.value})}/></label>
-                  <label className="field">Privacy label<input value={profileDraft.visibilityLabel} maxLength={40} onChange={event => setProfileDraft({...profileDraft, visibilityLabel: event.target.value})}/></label>
-                  <label className="field">Journal description<textarea value={profileDraft.siteDescription} maxLength={180} onChange={event => setProfileDraft({...profileDraft, siteDescription: event.target.value})}/></label>
-                  <small>These changes appear immediately throughout the journal. The original open-source defaults remain available as deployment settings.</small>
-                  <button className="primary wide" disabled={busy || !profileDraft.profileName.trim() || !profileDraft.profileHandle.trim() || !profileDraft.siteName.trim()} onClick={saveProfileSettings}>{busy ? 'Saving…' : 'Save profile settings'}</button>
+                  <details className="journal-wording">
+                    <summary>Journal wording</summary>
+                    <p>Only change these if you want to rename or reword the journal itself.</p>
+                    <label className="field">Journal title<input value={profileDraft.siteName} maxLength={80} onChange={event => setProfileDraft({...profileDraft, siteName: event.target.value})}/></label>
+                    <label className="field">Small heading<input value={profileDraft.eyebrow} maxLength={80} onChange={event => setProfileDraft({...profileDraft, eyebrow: event.target.value})}/></label>
+                    <label className="field">Journal type<input value={profileDraft.visibilityLabel} maxLength={40} onChange={event => setProfileDraft({...profileDraft, visibilityLabel: event.target.value})}/></label>
+                    <label className="field">Short description<textarea value={profileDraft.siteDescription} maxLength={180} onChange={event => setProfileDraft({...profileDraft, siteDescription: event.target.value})}/></label>
+                  </details>
+                  <button className="primary wide" disabled={busy || !profileDraft.profileName.trim() || !profileDraft.profileHandle.trim() || !profileDraft.siteName.trim()} onClick={saveProfileSettings}>{busy ? 'Saving…' : 'Save changes'}</button>
                 </>
                 : <>
                 <span className="eyebrow">OWNER ACCESS</span>
