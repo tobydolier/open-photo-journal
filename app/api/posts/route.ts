@@ -3,6 +3,17 @@ import { isAdminRequest } from "../../../lib/admin-auth";
 import { ensurePostLocationsTable, normalisePostLocation, savePostLocation } from "../../../lib/post-locations";
 
 const idPattern=/^[a-zA-Z0-9_-]{1,100}$/;
+const supportedImageTypes=new Set(["image/jpeg","image/webp","image/png"]);
+
+async function detectedImageType(file:File){
+  const declared=file.type.toLowerCase();
+  if(supportedImageTypes.has(declared))return declared;
+  const bytes=new Uint8Array(await file.slice(0,12).arrayBuffer());
+  if(bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return "image/jpeg";
+  if(bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47)return "image/png";
+  if(String.fromCharCode(...bytes.slice(0,4))==="RIFF"&&String.fromCharCode(...bytes.slice(8,12))==="WEBP")return "image/webp";
+  return "";
+}
 
 export async function GET(){
   await ensurePostLocationsTable();
@@ -40,8 +51,13 @@ export async function POST(request:Request){
   const files=form.getAll("photos") as File[];
   if(!files.length||files.length>20)return new Response("Choose 1–20 photos",{status:400});
   let size=0;
-  for(const file of files){
-    if(!["image/jpeg","image/webp","image/png"].includes(file.type)||file.size>4e6)return new Response("Images must be JPEG, PNG or WebP under 4 MB",{status:400});
+  const mediaTypes:string[]=[];
+  for(let index=0;index<files.length;index++){
+    const file=files[index];
+    const mediaType=await detectedImageType(file);
+    if(!mediaType)return new Response(`Photo ${index+1} was received as ${file.type||"an unknown format"}. Please choose a JPEG, PNG or WebP image.`,{status:400});
+    if(file.size>4e6)return new Response(`Photo ${index+1} is ${(file.size/1e6).toFixed(1)} MB after processing; the limit is 4 MB.`,{status:400});
+    mediaTypes.push(mediaType);
     size+=file.size;
   }
   const used=await env.DB!.prepare("SELECT COALESCE(SUM(bytes),0) AS n FROM posts").first<{n:number}>();
@@ -51,7 +67,7 @@ export async function POST(request:Request){
   try{
     for(let index=0;index<files.length;index++){
       const key=`${id}-${index}`;
-      await env.BUCKET!.put(key,await files[index].arrayBuffer(),{httpMetadata:{contentType:files[index].type}});
+      await env.BUCKET!.put(key,await files[index].arrayBuffer(),{httpMetadata:{contentType:mediaTypes[index]}});
       keys.push(key);
     }
     const statements=[env.DB!.prepare("INSERT INTO posts(id,caption,date,source,media,bytes) VALUES(?,?,?,?,?,?)")

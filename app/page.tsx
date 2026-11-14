@@ -177,13 +177,14 @@ async function compress(file: File) {
   canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height);
   if(bitmap)source.close();
   if(objectUrl)URL.revokeObjectURL(objectUrl);
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      blob => blob ? resolve(blob) : reject(Error('Could not process image')),
-      'image/webp',
-      0.84,
-    );
+  const makeJpeg = (quality:number) => new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(Error('Could not process image')), 'image/jpeg', quality);
   });
+  let output = await makeJpeg(0.86);
+  if (output.size > 3_800_000) output = await makeJpeg(0.72);
+  if (output.size > 3_800_000) output = await makeJpeg(0.58);
+  if (output.size > 4_000_000) throw Error('This photo is still too large after resizing. Please try a smaller version.');
+  return new File([output], 'photo.jpg', { type: 'image/jpeg', lastModified: Date.now() });
 }
 
 function instagramLocation(...values:unknown[]):PostLocation|undefined {
@@ -556,7 +557,7 @@ export default function Page() {
       if(location.latitude!==null)form.set('latitude',String(location.latitude));
       if(location.longitude!==null)form.set('longitude',String(location.longitude));
     }
-    for (const file of photos) form.append('photos', await compress(file), 'photo.webp');
+    for (const file of photos) form.append('photos', await compress(file));
     const response = await fetch('/api/posts', { method: 'POST', body: form });
     if (!response.ok) throw Error(await response.text());
     return response.json() as Promise<{ duplicate?: boolean; ok?: boolean }>;
