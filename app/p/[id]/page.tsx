@@ -5,15 +5,19 @@ import { notFound } from 'next/navigation';
 import { env } from 'cloudflare:workers';
 import ShareButtons from './share-buttons';
 import { getPublicSiteConfig } from '../../../lib/site-config';
+import { ensurePostLocationsTable } from '../../../lib/post-locations';
 
-type Post = {id:string;caption:string;date:string;source:string;media:string[]};
-type PostRow = Omit<Post, 'media'> & {media:string};
+type Post = {id:string;caption:string;date:string;source:string;media:string[];location:{name:string;latitude:number|null;longitude:number|null}|null};
+type PostRow = Omit<Post, 'media'|'location'> & {media:string;location_name:string|null;latitude:number|null;longitude:number|null};
 
 async function getPost(id: string): Promise<Post | null> {
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) return null;
-  const row = await env.DB!.prepare('SELECT id, caption, date, source, media FROM posts WHERE id=?').bind(id).first<PostRow>();
+  await ensurePostLocationsTable();
+  const row = await env.DB!.prepare(`SELECT p.id,p.caption,p.date,p.source,p.media,l.name AS location_name,l.latitude,l.longitude
+    FROM posts p LEFT JOIN post_locations l ON l.post_id=p.id WHERE p.id=?`).bind(id).first<PostRow>();
   if (!row) return null;
-  return {...row, media: JSON.parse(row.media)} as Post;
+  return {id:row.id,caption:row.caption,date:row.date,source:row.source,media:JSON.parse(row.media),
+    location:row.location_name||row.latitude!==null&&row.longitude!==null?{name:row.location_name||'',latitude:row.latitude,longitude:row.longitude}:null};
 }
 
 async function getOrigin() {
@@ -79,7 +83,7 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
               ? <img src={config.profileImageUrl} alt="" aria-hidden="true"/>
               : config.profileInitial}
           </div>
-          <div><b>{config.profileHandle}</b><small>{date}</small></div>
+          <div><b>{config.profileHandle}</b><small>{date}</small>{post.location&&<span className="post-location">⌖ {post.location.name||'Pinned location'}</span>}</div>
           {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
         </div>
         <div className="postgallery">

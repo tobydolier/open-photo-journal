@@ -16,7 +16,7 @@ Lightroom, or wherever the owner already keeps them.
 
 - Public feed, grid, search, carousels, captions, dates, and source labels
 - Permanent `/p/:id` post pages with Open Graph and Bluesky-ready metadata
-- Owner-only create, delete, favourite, and archive-import controls
+- Owner-only create, delete, favourite, optional-location, and archive-import controls
 - HTML and JSON Instagram export import, with duplicate detection and resume
 - Browser-side WebP resizing and re-encoding, which removes embedded EXIF/GPS
 - Configurable name, profile, locale, storage ceiling, and canonical URL
@@ -80,7 +80,7 @@ node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
   d1 execute DB --local --config dist/server/wrangler.json \
   --persist-to .wrangler/state --file drizzle/0000_outstanding_viper.sql
 
-for migration in drizzle/0001_framefeed_interest.sql drizzle/0002_manual_post_order.sql drizzle/0003_featured_photos.sql drizzle/0004_photo_frames.sql drizzle/0005_expand_gallery_frames.sql drizzle/0006_add_ornate_frame.sql; do
+for migration in drizzle/0001_framefeed_interest.sql drizzle/0002_manual_post_order.sql drizzle/0003_featured_photos.sql drizzle/0004_photo_frames.sql drizzle/0005_expand_gallery_frames.sql drizzle/0006_add_ornate_frame.sql drizzle/0007_post_locations.sql; do
   node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
     d1 execute DB --local --config dist/server/wrangler.json \
     --persist-to .wrangler/state --file "$migration"
@@ -102,7 +102,7 @@ and fresh data resources to that installation. Never copy a `project_id` from
 another deployment.
 
 The runtime is Cloudflare-native. Before the first production deployment, apply
-`drizzle/0000_outstanding_viper.sql` through `drizzle/0005_expand_gallery_frames.sql`
+`drizzle/0000_outstanding_viper.sql` through `drizzle/0007_post_locations.sql`
 to the production D1 database in numeric order. Configure `ADMIN_PASSWORD`
 and `ADMIN_SESSION_SECRET` as runtime secrets rather than build variables.
 Keep all passwords, account IDs, photographs, and deployment-specific values

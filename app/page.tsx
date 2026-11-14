@@ -16,6 +16,7 @@ import {
   Lock,
   LogIn,
   LogOut,
+  MapPin,
   Maximize2,
   PlusSquare,
   Search,
@@ -34,16 +35,19 @@ type Post = {
   media: string[];
   bytes: number;
   favorite: number;
+  location: PostLocation | null;
 };
 
 type FeaturedPhoto = { slot: number; postId: string; key: string; src: string; caption: string };
 type FrameStyle = '' | 'white' | 'mahogany' | 'ornate' | 'black' | 'pine';
-type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''> };
+type PhotoFrame = { postId: string; key: string; style: Exclude<FrameStyle, ''>; mountColour?: string };
+type PostLocation = { name: string; latitude: number | null; longitude: number | null };
 
-type ArchivePost = { id?: string; caption: string; date: string; paths: string[] };
-type JsonMedia = { uri?: string; title?: string; creation_timestamp?: number };
-type JsonPost = { media?: JsonMedia[]; title?: string; creation_timestamp?: number };
-type FrameFeedPost = { id?: string; caption?: string; date?: string; media?: string[] };
+type ArchivePost = { id?: string; caption: string; date: string; paths: string[]; location?: PostLocation };
+type JsonExif = { latitude?: number | string; longitude?: number | string };
+type JsonMedia = { uri?: string; title?: string; creation_timestamp?: number; location?: unknown; latitude?:number|string; longitude?:number|string; media_metadata?:{photo_metadata?:{exif_data?:JsonExif[]}} };
+type JsonPost = { media?: JsonMedia[]; title?: string; creation_timestamp?: number; location?:unknown; place?:unknown; location_name?:string };
+type FrameFeedPost = { id?: string; caption?: string; date?: string; media?: string[]; location?:PostLocation };
 
 const defaultConfig: PublicSiteConfig = {
   siteName: 'Open Photo Journal',
@@ -122,10 +126,12 @@ function parseHtmlPosts(html: string) {
       .filter(path => path.startsWith('media/posts/'));
     const date = parseInstagramDate(block.querySelector('._3-94._a6-o')?.textContent || '');
     if (!paths.length || !date) return [];
+    const place = block.querySelector('a[href*="/explore/locations/"]')?.textContent?.trim();
     return [{
       caption: block.querySelector('h2')?.textContent?.trim() || '',
       date,
       paths: [...new Set(paths)],
+      location: place ? {name:place,latitude:null,longitude:null} : undefined,
     }];
   });
 }
@@ -136,13 +142,28 @@ async function archiveId(paths: string[]) {
 }
 
 async function compress(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  let source:ImageBitmap|HTMLImageElement;
+  let objectUrl='';
+  try{
+    source=await createImageBitmap(file);
+  }catch{
+    objectUrl=URL.createObjectURL(file);
+    source=await new Promise<HTMLImageElement>((resolve,reject)=>{
+      const image=new Image();
+      image.onload=()=>resolve(image);
+      image.onerror=()=>reject(Error('This photo format could not be read. Try sharing it as a JPEG.'));
+      image.src=objectUrl;
+    });
+  }
+  const width=source instanceof ImageBitmap?source.width:source.naturalWidth;
+  const height=source instanceof ImageBitmap?source.height:source.naturalHeight;
+  const scale = Math.min(1, 1600 / Math.max(width, height));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  canvas.getContext('2d')!.drawImage(source, 0, 0, canvas.width, canvas.height);
+  if(source instanceof ImageBitmap)source.close();
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       blob => blob ? resolve(blob) : reject(Error('Could not process image')),
@@ -152,22 +173,51 @@ async function compress(file: File) {
   });
 }
 
+function instagramLocation(...values:unknown[]):PostLocation|undefined {
+  let name='';
+  let latitude:number|null=null;
+  let longitude:number|null=null;
+  const visit=(value:unknown)=>{
+    if(typeof value==='string'&&!name){name=value.trim().slice(0,160);return;}
+    if(!value||typeof value!=='object')return;
+    const item=value as Record<string,unknown>;
+    if(!name)name=String(item.name??item.title??item.location_name??'').trim().slice(0,160);
+    const lat=Number(item.latitude??item.lat);
+    const lon=Number(item.longitude??item.lng??item.lon);
+    if(latitude===null&&Number.isFinite(lat)&&lat>=-90&&lat<=90)latitude=lat;
+    if(longitude===null&&Number.isFinite(lon)&&lon>=-180&&lon<=180)longitude=lon;
+    if(item.location&&item.location!==value)visit(item.location);
+  };
+  values.forEach(visit);
+  return name||latitude!==null&&longitude!==null?{name,latitude,longitude}:undefined;
+}
+
 async function cropProfileImage(file: File, zoom: number, offset: {x:number;y:number}) {
-  const bitmap = await createImageBitmap(file);
-  const baseScale = Math.max(profileCropSize / bitmap.width, profileCropSize / bitmap.height);
+  let source:ImageBitmap|HTMLImageElement;
+  let objectUrl='';
+  try{source=await createImageBitmap(file);}catch{
+    objectUrl=URL.createObjectURL(file);
+    source=await new Promise<HTMLImageElement>((resolve,reject)=>{
+      const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error('This photo format could not be read. Try sharing it as a JPEG.'));image.src=objectUrl;
+    });
+  }
+  const width=source instanceof ImageBitmap?source.width:source.naturalWidth;
+  const height=source instanceof ImageBitmap?source.height:source.naturalHeight;
+  const baseScale = Math.max(profileCropSize / width, profileCropSize / height);
   const scale = baseScale * zoom;
-  const renderedWidth = bitmap.width * scale;
-  const renderedHeight = bitmap.height * scale;
+  const renderedWidth = width * scale;
+  const renderedHeight = height * scale;
   const left = (profileCropSize - renderedWidth) / 2 + offset.x;
   const top = (profileCropSize - renderedHeight) / 2 + offset.y;
   const sourceSize = profileCropSize / scale;
-  const sourceX = Math.max(0, Math.min(bitmap.width - sourceSize, -left / scale));
-  const sourceY = Math.max(0, Math.min(bitmap.height - sourceSize, -top / scale));
+  const sourceX = Math.max(0, Math.min(width - sourceSize, -left / scale));
+  const sourceY = Math.max(0, Math.min(height - sourceSize, -top / scale));
   const canvas = document.createElement('canvas');
   canvas.width = 800;
   canvas.height = 800;
-  canvas.getContext('2d')!.drawImage(bitmap, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 800, 800);
-  bitmap.close();
+  canvas.getContext('2d')!.drawImage(source, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 800, 800);
+  if(source instanceof ImageBitmap)source.close();
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(blob => blob ? resolve(blob) : reject(Error('Could not crop profile photo')), 'image/webp', 0.88);
   });
@@ -179,6 +229,16 @@ function ProfileAvatar({ config, size = '' }: { config: PublicSiteConfig; size?:
       ? <img src={config.profileImageUrl} alt="" aria-hidden="true"/>
       : config.profileInitial}
   </div>;
+}
+
+function PostLocationLabel({location}:{location:PostLocation|null}) {
+  if(!location)return null;
+  const label=location.name||'Pinned location';
+  if(location.latitude!==null&&location.longitude!==null){
+    const href=`https://www.openstreetmap.org/?mlat=${encodeURIComponent(location.latitude)}&mlon=${encodeURIComponent(location.longitude)}#map=14/${encodeURIComponent(location.latitude)}/${encodeURIComponent(location.longitude)}`;
+    return <a className="post-location" href={href} target="_blank" rel="noreferrer"><MapPin size={11}/>{label}</a>;
+  }
+  return <span className="post-location"><MapPin size={11}/>{label}</span>;
 }
 
 function frameVariant(id: string) {
@@ -258,7 +318,7 @@ function mutedDominantColour(image: HTMLImageElement, frame: 'mahogany' | 'pine'
 }
 
 function Photo({
-  post, siteName, isAdmin, photoFrames, galleryPhotos, onOpen, onFrame, onGallery, onRemoveFromGallery,
+  post, siteName, isAdmin, photoFrames, galleryPhotos, onOpen, onFrame, onPreserveMount, onGallery, onRemoveFromGallery,
 }: {
   post: Post;
   siteName: string;
@@ -266,7 +326,8 @@ function Photo({
   photoFrames: PhotoFrame[];
   galleryPhotos: Array<FeaturedPhoto | null>;
   onOpen: (post: Post, mediaIndex: number) => void;
-  onFrame: (post: Post, mediaKey: string, style: FrameStyle) => Promise<boolean>;
+  onFrame: (post: Post, mediaKey: string, style: FrameStyle, mountColour?:string) => Promise<boolean>;
+  onPreserveMount: (post:Post,mediaKey:string,style:FrameStyle,mountColour:string)=>void;
   onGallery: (post: Post, mediaKey: string) => Promise<void>;
   onRemoveFromGallery: (slot: number) => Promise<void>;
 }) {
@@ -276,18 +337,25 @@ function Photo({
   const [mountColour, setMountColour] = useState('');
   const imageElement = useRef<HTMLImageElement>(null);
   const src = `/api/media/${encodeURIComponent(post.media[index])}`;
-  const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === post.id && frame.key === post.media[index])?.style || '';
+  const frame=photoFrames.find(item => item.postId === post.id && item.key === post.media[index]);
+  const frameStyle: FrameStyle = frame?.style || '';
+  const savedMountColour=frame?.mountColour||'';
+  const applyMountColour=(image:HTMLImageElement)=>{
+    const colour=savedMountColour||mutedDominantColour(image,frameStyle==='pine'?'pine':'mahogany');
+    setMountColour(colour);
+    if(isAdmin&&!savedMountColour&&colour&&['mahogany','ornate','pine'].includes(frameStyle))onPreserveMount(post,post.media[index],frameStyle,colour);
+  };
   useEffect(() => {
-    setMountColour('');
+    setMountColour(savedMountColour);
     const image = imageElement.current;
-    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image, frameStyle === 'pine' ? 'pine' : 'mahogany'));
-  }, [src, frameStyle]);
+    if (image?.complete && image.naturalWidth) applyMountColour(image);
+  }, [src, frameStyle, savedMountColour]);
   const gallerySlot = galleryPhotos.findIndex(photo => photo?.postId === post.id && photo.key === post.media[index]);
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <div className="photo-block">
     <div className={`photo ${frameStyle ? `photo-framed photo-frame-${frameStyle}` : ''} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
     <button className="photo-open" aria-label="Open photo full screen" onClick={() => onOpen(post, index)}>
-      <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/>
+      <img ref={imageElement} src={src} alt={post.caption || `Photo from ${siteName}`} loading="lazy" decoding="async" onLoad={event => applyMountColour(event.currentTarget)}/>
       <span className="expand"><Maximize2 size={16}/> Full screen</span>
     </button>
     {post.media.length > 1 && <>
@@ -303,7 +371,7 @@ function Photo({
         <select key={`style:${post.id}:${index}`} value={frameStyle} disabled={savingFrame} aria-label="Choose photo frame" onChange={async event => {
           setSavingFrame(true);
           setFrameError(false);
-          const saved = await onFrame(post, post.media[index], event.target.value as FrameStyle);
+          const saved = await onFrame(post, post.media[index], event.target.value as FrameStyle, mountColour);
           setFrameError(!saved);
           setSavingFrame(false);
         }}>
@@ -323,14 +391,16 @@ function Photo({
 }
 
 function GalleryArtwork({
-  photo, post, mediaIndex, frameStyle, slot, onOpen, arranging, canMoveEarlier, canMoveLater, onMove,
+  photo, post, mediaIndex, frameStyle, savedMountColour, slot, onOpen, onPreserveMount, arranging, canMoveEarlier, canMoveLater, onMove,
 }: {
   photo: FeaturedPhoto;
   post: Post;
   mediaIndex: number;
   frameStyle: FrameStyle;
+  savedMountColour: string;
   slot: number;
   onOpen: (post: Post, mediaIndex: number) => void;
+  onPreserveMount: (post:Post,mediaKey:string,style:FrameStyle,mountColour:string)=>void;
   arranging: boolean;
   canMoveEarlier: boolean;
   canMoveLater: boolean;
@@ -338,16 +408,21 @@ function GalleryArtwork({
 }) {
   const [mountColour, setMountColour] = useState('');
   const imageElement = useRef<HTMLImageElement>(null);
+  const applyMountColour=(image:HTMLImageElement)=>{
+    const colour=savedMountColour||mutedDominantColour(image,frameStyle==='pine'?'pine':'mahogany');
+    setMountColour(colour);
+    if(!savedMountColour&&colour&&['mahogany','ornate','pine'].includes(frameStyle))onPreserveMount(post,photo.key,frameStyle,colour);
+  };
   useEffect(() => {
-    setMountColour('');
+    setMountColour(savedMountColour);
     const image = imageElement.current;
-    if (image?.complete && image.naturalWidth) setMountColour(mutedDominantColour(image, frameStyle === 'pine' ? 'pine' : 'mahogany'));
-  }, [photo.src, frameStyle]);
+    if (image?.complete && image.naturalWidth) applyMountColour(image);
+  }, [photo.src, frameStyle, savedMountColour]);
   const mountStyle = mountColour ? ({ [frameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: mountColour } as CSSProperties) : undefined;
   return <div className={`gallery-artwork gallery-position-${slot + 1} ${arranging ? 'gallery-artwork-arranging' : ''}`}>
     <button className="gallery-artwork-open" onClick={() => onOpen(post,mediaIndex)} aria-label={`Open gallery photograph ${slot + 1} full screen`}>
       <span className={`gallery-frame ${frameStyle ? `photo-frame-${frameStyle}` : 'gallery-frame-unframed'} ${frameStyle === 'ornate' ? `frame-variant-${frameVariant(post.id)}` : ''}`.trim()} style={mountStyle}>
-        <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => setMountColour(mutedDominantColour(event.currentTarget, frameStyle === 'pine' ? 'pine' : 'mahogany'))}/></span>
+        <span className="photo-open gallery-mount"><img ref={imageElement} src={photo.src} alt={photo.caption || `Gallery photograph ${slot + 1}`} loading="lazy" decoding="async" onLoad={event => applyMountColour(event.currentTarget)}/></span>
       </span>
       <small>{photo.caption || 'Untitled'}</small>
     </button>
@@ -370,6 +445,10 @@ export default function Page() {
   const [files, setFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [includeLocation, setIncludeLocation] = useState(false);
+  const [locationName, setLocationName] = useState('');
+  const [locationCoordinates, setLocationCoordinates] = useState<{latitude:number;longitude:number}|null>(null);
+  const [locationStatus, setLocationStatus] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [photoFrames, setPhotoFrames] = useState<PhotoFrame[]>([]);
@@ -390,6 +469,7 @@ export default function Page() {
   const archiveFiles = useRef<HTMLInputElement>(null);
   const feedEnd = useRef<HTMLDivElement>(null);
   const profileDrag = useRef<{pointerId:number;startX:number;startY:number;x:number;y:number} | null>(null);
+  const preservingMounts = useRef(new Set<string>());
 
   async function load() {
     const [postsResponse, configResponse, framesResponse, galleryResponse] = await Promise.all([
@@ -446,12 +526,18 @@ export default function Page() {
     setProfileOffset({x:0,y:0});
   }
 
-  async function upload(id: string, postCaption: string, postDate: string, source: string, photos: File[]) {
+  async function upload(id: string, postCaption: string, postDate: string, source: string, photos: File[], location?:PostLocation) {
     const form = new FormData();
     form.set('id', id);
     form.set('caption', postCaption);
     form.set('date', postDate);
     form.set('source', source);
+    if(location){
+      form.set('locationProvided','1');
+      form.set('locationName',location.name);
+      if(location.latitude!==null)form.set('latitude',String(location.latitude));
+      if(location.longitude!==null)form.set('longitude',String(location.longitude));
+    }
     for (const file of photos) form.append('photos', await compress(file), 'photo.webp');
     const response = await fetch('/api/posts', { method: 'POST', body: form });
     if (!response.ok) throw Error(await response.text());
@@ -462,11 +548,20 @@ export default function Page() {
     setBusy(true);
     setStatus('Preparing your photos…');
     try {
-      await upload(crypto.randomUUID(), caption, new Date(date).toISOString(), 'native', files);
+      const location=includeLocation?{
+        name:locationName.trim(),
+        latitude:locationCoordinates?.latitude??null,
+        longitude:locationCoordinates?.longitude??null,
+      }:undefined;
+      await upload(crypto.randomUUID(), caption, new Date(date).toISOString(), 'native', files, location);
       await load();
       setModal('');
       setFiles([]);
       setCaption('');
+      setIncludeLocation(false);
+      setLocationName('');
+      setLocationCoordinates(null);
+      setLocationStatus('');
       setStatus('Photo added to your journal.');
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : String(cause));
@@ -475,12 +570,23 @@ export default function Page() {
     }
   }
 
+  function useCurrentLocation() {
+    if(!navigator.geolocation){setLocationStatus('Location is not available in this browser.');return;}
+    setLocationStatus('Finding your position…');
+    navigator.geolocation.getCurrentPosition(position=>{
+      setLocationCoordinates({latitude:position.coords.latitude,longitude:position.coords.longitude});
+      setIncludeLocation(true);
+      setLocationStatus('Position added. You can give it a public place name below.');
+    },()=>setLocationStatus('Location was not added. You can still type a place name.'),{enableHighAccuracy:false,timeout:10000,maximumAge:300000});
+  }
+
   async function importArchive(list: FileList | null) {
     if (!list) return;
     setBusy(true);
     let added = 0;
     let duplicates = 0;
     let skipped = 0;
+    let locationsRestored = 0;
     try {
       const archiveFiles = Array.from(list);
       const byPath = indexArchiveFiles(archiveFiles);
@@ -499,7 +605,7 @@ export default function Page() {
               skipped++;
               continue;
             }
-            rows.push({ id: row.id, caption: row.caption || '', date: row.date, paths });
+            rows.push({ id: row.id, caption: row.caption || '', date: row.date, paths, location: row.location });
           }
           continue;
         }
@@ -513,7 +619,9 @@ export default function Page() {
           }
           let title = media.find(item => item.title)?.title || row.title || '';
           try { title = decodeURIComponent(escape(title)); } catch {}
-          rows.push({ caption: title, date: new Date(timestamp * 1000).toISOString(), paths: media.map(item => cleanPath(item.uri || '')) });
+          const exif=media.flatMap(item=>item.media_metadata?.photo_metadata?.exif_data||[]);
+          const location=instagramLocation(row.location,row.place,row.location_name,...media.map(item=>item.location),...media,...exif);
+          rows.push({ caption: title, date: new Date(timestamp * 1000).toISOString(), paths: media.map(item => cleanPath(item.uri || '')), location });
         }
       }
 
@@ -530,11 +638,15 @@ export default function Page() {
         }
         const id = row.id || await archiveId(row.paths);
         if (existingIds.has(id)) {
+          if(row.location){
+            const response=await fetch('/api/posts',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,location:row.location})});
+            if(response.ok)locationsRestored++;
+          }
           duplicates++;
           continue;
         }
         setStatus(`Importing ${added + duplicates + 1} of ${rows.length} posts…`);
-        const result = await upload(id, row.caption, row.date, 'instagram', images as File[]);
+        const result = await upload(id, row.caption, row.date, 'instagram', images as File[], row.location);
         if (result.duplicate) duplicates++;
         else {
           added++;
@@ -542,7 +654,7 @@ export default function Page() {
         }
       }
       await load();
-      setStatus(`Import complete: ${added} added, ${duplicates} already imported, ${skipped} skipped (missing/unsupported media).`);
+      setStatus(`Import complete: ${added} added, ${duplicates} already imported, ${locationsRestored} locations restored, ${skipped} skipped (missing/unsupported media).`);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setStatus(`Import paused: ${message} ${added} saved; select the folder again to resume.`);
@@ -640,12 +752,12 @@ export default function Page() {
     }
   }
 
-  async function setPhotoFrame(post: Post, mediaKey: string, style: FrameStyle) {
+  async function setPhotoFrame(post: Post, mediaKey: string, style: FrameStyle, mountColour='') {
     try {
       const response = await fetch('/api/photo-frames', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: post.id, mediaKey, style }),
+        body: JSON.stringify({ postId: post.id, mediaKey, style, mountColour }),
       });
       if (!response.ok) throw Error(await response.text() || 'Could not save frame');
       await load();
@@ -656,6 +768,18 @@ export default function Page() {
       setStatus(cause instanceof Error ? cause.message : String(cause));
       return false;
     }
+  }
+
+  function preserveMountColour(post:Post,mediaKey:string,style:FrameStyle,mountColour:string) {
+    const identity=`${post.id}:${mediaKey}`;
+    if(!config.isAdmin||!['mahogany','ornate','pine'].includes(style)||!mountColour||preservingMounts.current.has(identity))return;
+    if(photoFrames.find(frame=>frame.postId===post.id&&frame.key===mediaKey)?.mountColour)return;
+    preservingMounts.current.add(identity);
+    fetch('/api/photo-frames',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({postId:post.id,mediaKey,style,mountColour})})
+      .then(response=>{
+        if(!response.ok)return;
+        setPhotoFrames(frames=>frames.map(frame=>frame.postId===post.id&&frame.key===mediaKey?{...frame,mountColour}:frame));
+      }).finally(()=>preservingMounts.current.delete(identity));
   }
 
   async function placeInGallery(post:Post, mediaKey:string, slot:number) {
@@ -788,10 +912,10 @@ export default function Page() {
     if (index >= 0) setViewerIndex(index);
   };
   const viewer = viewerIndex === null ? null : photoItems[viewerIndex];
-  const viewerFrameStyle: FrameStyle = viewer
-    ? photoFrames.find(frame => frame.postId === viewer.post.id && frame.key === viewer.key)?.style || ''
-    : '';
-  useEffect(() => setViewerMountColour(''), [viewer?.key, viewerFrameStyle]);
+  const viewerFrame=viewer?photoFrames.find(frame=>frame.postId===viewer.post.id&&frame.key===viewer.key):undefined;
+  const viewerFrameStyle: FrameStyle = viewerFrame?.style || '';
+  const viewerSavedMountColour=viewerFrame?.mountColour||'';
+  useEffect(() => setViewerMountColour(viewerSavedMountColour), [viewer?.key, viewerFrameStyle, viewerSavedMountColour]);
   const viewerMountStyle = viewerMountColour ? ({ [viewerFrameStyle === 'pine' ? '--pine-mount' : '--mahogany-mount']: viewerMountColour } as CSSProperties) : undefined;
   const galleryItems = galleryPhotos.flatMap((photo, slot) => {
     if (!photo) return [];
@@ -799,18 +923,19 @@ export default function Page() {
     if (!post) return [];
     const mediaIndex = post.media.indexOf(photo.key);
     if (mediaIndex < 0) return [];
-    const frameStyle: FrameStyle = photoFrames.find(frame => frame.postId === photo.postId && frame.key === photo.key)?.style || '';
-    return [{ photo, post, mediaIndex, frameStyle, slot }];
+    const frame=photoFrames.find(item => item.postId === photo.postId && item.key === photo.key);
+    const frameStyle: FrameStyle = frame?.style || '';
+    return [{ photo, post, mediaIndex, frameStyle, savedMountColour:frame?.mountColour||'', slot }];
   });
 
 
   const postCard = (post: Post) => <article key={post.id}>
     <div className="posthead">
       <ProfileAvatar config={config} size="small"/>
-      <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small></div>
+      <div><b>{config.profileHandle}</b><small>{dateFormat(post.date)}</small><PostLocationLabel location={post.location}/></div>
       {post.source === 'instagram' && <span className="badge">↗ From Instagram</span>}
     </div>
-    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} galleryPhotos={galleryPhotos} onOpen={openPhoto} onFrame={setPhotoFrame} onGallery={addToGallery} onRemoveFromGallery={removeFromGallery}/>
+    <Photo post={post} siteName={config.siteName} isAdmin={config.isAdmin} photoFrames={photoFrames} galleryPhotos={galleryPhotos} onOpen={openPhoto} onFrame={setPhotoFrame} onPreserveMount={preserveMountColour} onGallery={addToGallery} onRemoveFromGallery={removeFromGallery}/>
     <div className="postbody">
       <div className="actions">
         {config.isAdmin && <button aria-label="Favourite" onClick={() => favorite(post)}><Heart fill={post.favorite ? '#ed476b' : 'none'} color={post.favorite ? '#ed476b' : 'currentColor'}/></button>}
@@ -900,9 +1025,9 @@ export default function Page() {
           <div className="gallery-walk" aria-label="Gallery walls">
           {galleryItems.length ? Array.from({ length: Math.ceil(galleryItems.length / 3) }, (_, wall) =>
             <div className="gallery-wall" key={wall} aria-label={`Gallery wall ${wall + 1}`}>
-              {galleryItems.slice(wall * 3, wall * 3 + 3).map(({photo,post,mediaIndex,frameStyle,slot},wallIndex) => {
+              {galleryItems.slice(wall * 3, wall * 3 + 3).map(({photo,post,mediaIndex,frameStyle,savedMountColour,slot},wallIndex) => {
                 const galleryIndex=wall*3+wallIndex;
-                return <GalleryArtwork key={`${photo.postId}:${photo.key}`} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} slot={slot} onOpen={openPhoto} arranging={arrangingGallery} canMoveEarlier={galleryIndex>0} canMoveLater={galleryIndex<galleryItems.length-1} onMove={change=>void moveGalleryPhoto(slot,change)}/>;
+                return <GalleryArtwork key={`${photo.postId}:${photo.key}`} photo={photo} post={post} mediaIndex={mediaIndex} frameStyle={frameStyle} savedMountColour={savedMountColour} slot={slot} onOpen={openPhoto} onPreserveMount={preserveMountColour} arranging={arrangingGallery} canMoveEarlier={galleryIndex>0} canMoveLater={galleryIndex<galleryItems.length-1} onMove={change=>void moveGalleryPhoto(slot,change)}/>;
               }) }
             </div>)
           : <div className="gallery-wall gallery-wall-empty"><div className="gallery-empty"><Images size={38}/><h2>The gallery is waiting.</h2><p>{config.isAdmin ? 'Add up to nine photographs using the gallery control beneath any post.' : 'No photographs have been hung here yet.'}</p></div></div>}
@@ -955,10 +1080,14 @@ export default function Page() {
       <button className="lightbox-close" aria-label="Close full-screen viewer" onClick={() => setViewerIndex(null)}><X/></button>
       <button className="lightbox-prev" aria-label="Previous photo" onClick={() => setViewerIndex((viewerIndex + photoItems.length - 1) % photoItems.length)}><ChevronLeft/></button>
       <div className={`lightbox-photo-frame ${viewerFrameStyle ? `lightbox-frame-${viewerFrameStyle}` : ''} ${viewerFrameStyle === 'ornate' ? `frame-variant-${frameVariant(viewer.post.id)}` : ''}`.trim()} style={viewerMountStyle}>
-        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => setViewerMountColour(mutedDominantColour(event.currentTarget, viewerFrameStyle === 'pine' ? 'pine' : 'mahogany'))}/></div>
+        <div className="lightbox-mount"><img src={`/api/media/${encodeURIComponent(viewer.key)}`} alt={viewer.post.caption || `Photo from ${config.siteName}`} onLoad={event => {
+          const colour=viewerSavedMountColour||mutedDominantColour(event.currentTarget,viewerFrameStyle==='pine'?'pine':'mahogany');
+          setViewerMountColour(colour);
+          if(colour&&!viewerSavedMountColour)preserveMountColour(viewer.post,viewer.key,viewerFrameStyle,colour);
+        }}/></div>
       </div>
       <button className="lightbox-next" aria-label="Next photo" onClick={() => setViewerIndex((viewerIndex + 1) % photoItems.length)}><ChevronRight/></button>
-      <div className="lightbox-caption"><b>{viewer.post.caption || 'A moment worth keeping.'}</b><span>{dateFormat(viewer.post.date)} · {viewerIndex + 1} of {photoItems.length}</span></div>
+      <div className="lightbox-caption"><b>{viewer.post.caption || 'A moment worth keeping.'}</b><span>{dateFormat(viewer.post.date)}{viewer.post.location ? ` · ${viewer.post.location.name||'Pinned location'}` : ''} · {viewerIndex + 1} of {photoItems.length}</span></div>
     </div>}
 
     {modal && <div className="overlay">
@@ -972,21 +1101,30 @@ export default function Page() {
               <label className="drop">
                 <ImagePlus size={30}/>
                 <b>{files.length ? `${files.length} photos selected` : 'Choose your photos'}</b>
-                <small>JPEG, PNG or WebP · up to 20 per post</small>
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy} onChange={event => setFiles(Array.from(event.target.files || []).slice(0, 20))}/>
+                <small>iPhone Photos, JPEG, PNG or WebP · up to 20 per post</small>
+                <input type="file" accept="image/*,.heic,.heif" multiple disabled={busy} onChange={event => setFiles(Array.from(event.target.files || []).slice(0, 20))}/>
               </label>
               <label className="field">Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder="What’s the story?"/></label>
               <label className="field">Date<input type="date" value={date} onChange={event => setDate(event.target.value)}/></label>
-              <small>Photos are resized, compressed and re-encoded before upload, removing embedded location metadata. Originals stay untouched.</small>
+              <label className="location-choice"><input type="checkbox" checked={includeLocation} onChange={event=>{
+                setIncludeLocation(event.target.checked);
+                if(!event.target.checked){setLocationCoordinates(null);setLocationStatus('');}
+              }}/><span><b>Add a location</b><small>Off by default. You decide what is shown with this post.</small></span></label>
+              {includeLocation&&<div className="location-editor">
+                <label className="field">Place name<input value={locationName} maxLength={160} placeholder="e.g. Guildford, Surrey" onChange={event=>setLocationName(event.target.value)}/></label>
+                <button type="button" className="location-pin" onClick={useCurrentLocation}><MapPin size={14}/>{locationCoordinates?'Update current position':'Use current position'}</button>
+                {locationStatus&&<small>{locationStatus}</small>}
+              </div>}
+              <small>Photos are resized and re-encoded, so embedded GPS metadata is removed. Only a location you choose above is saved. Originals stay untouched.</small>
               <button className="primary wide" disabled={busy || !files.length || !date} onClick={publish}>{busy ? 'Saving…' : 'Add to my journal'}</button>
             </>
             : modal === 'import'
               ? <>
                 <span className="eyebrow">OLD MEMORIES, NEW HOME</span>
                 <h2>Import an Instagram archive.</h2>
-                <p>Preserve photographs, original dates and captions, with a small source label on imported posts.</p>
+                <p>Preserve photographs, original dates, captions and any location data Instagram included, with a small source label on imported posts.</p>
                 <ol><li>Unzip the Instagram archive on your computer.</li><li>Keep its HTML or JSON post file and media folders together.</li><li>Select the entire extracted folder below.</li></ol>
-                <div className="importnote">HTML and JSON exports are supported, including photo carousels. Videos, Stories, missing files and unsupported formats are skipped. Existing imports are detected so you can safely resume.</div>
+                <div className="importnote">HTML and JSON exports are supported, including photo carousels. Re-selecting an archive can restore locations to posts already imported without duplicating them. Videos, Stories, missing files and unsupported formats are skipped.</div>
                 <input type="file" ref={folder} style={{ display: 'none' }} {...({ webkitdirectory: '', directory: '' } as object)} multiple onChange={event => importArchive(event.target.files)}/>
                 <button className="primary wide" disabled={busy} onClick={() => folder.current?.click()}><Download size={17}/>{busy ? 'Importing…' : 'Select extracted Instagram folder'}</button>
                 <input type="file" ref={archiveFiles} style={{ display: 'none' }} multiple accept=".html,.json,.jpg,.jpeg,.png,.webp" onChange={event => importArchive(event.target.files)}/>
@@ -1002,7 +1140,7 @@ export default function Page() {
                     <ProfileAvatar config={config} size="large"/>
                     <b>{profilePhoto ? 'Choose a different photo' : config.profileImageUrl ? 'Replace profile photo' : 'Choose profile photo'}</b>
                     <small>JPEG, PNG or WebP · you can crop and zoom before saving</small>
-                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => chooseProfilePhoto(event.target.files?.[0] || null)}/>
+                    <input type="file" accept="image/*,.heic,.heif" disabled={busy} onChange={event => chooseProfilePhoto(event.target.files?.[0] || null)}/>
                   </label>
                   {profilePhoto && profilePreview && <div className="profile-cropper">
                     <div className="profile-crop-window" onPointerDown={event=>{
