@@ -26,7 +26,12 @@ const managedLinux = readExecutionProfile() === "managed-linux";
 const localBindingConfig = {
   ...(framefeedDeploy ? { name: "framefeed", keep_vars: true } : {}),
   ...(framefeedDeploy
-    ? { routes: [{ pattern: "framefeed.co.uk", custom_domain: true }] }
+    ? {
+        routes: [
+          { pattern: "framefeed.co.uk", custom_domain: true },
+          { pattern: "toby.framefeed.co.uk", custom_domain: true },
+        ],
+      }
     : {}),
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
