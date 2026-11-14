@@ -80,7 +80,7 @@ node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
   d1 execute DB --local --config dist/server/wrangler.json \
   --persist-to .wrangler/state --file drizzle/0000_outstanding_viper.sql
 
-for migration in drizzle/0001_framefeed_interest.sql drizzle/0002_manual_post_order.sql drizzle/0003_featured_photos.sql drizzle/0004_photo_frames.sql drizzle/0005_expand_gallery_frames.sql; do
+for migration in drizzle/0001_framefeed_interest.sql drizzle/0002_manual_post_order.sql drizzle/0003_featured_photos.sql drizzle/0004_photo_frames.sql drizzle/0005_expand_gallery_frames.sql drizzle/0006_add_ornate_frame.sql; do
   node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
     d1 execute DB --local --config dist/server/wrangler.json \
     --persist-to .wrangler/state --file "$migration"

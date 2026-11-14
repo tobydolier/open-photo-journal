@@ -82,6 +82,7 @@ function editableProfile(config: PublicSiteConfig): EditableProfile {
 }
 
 const imageFile = /\.(?:jpe?g|png|webp)$/i;
+const postBatchSize = 24;
 
 function cleanPath(path: string) {
   return path.replace(/\\/g, '/').replace(/^(?:\.\.\/|\.\/)+/, '').replace(/^\/+/, '');
@@ -362,10 +363,12 @@ export default function Page() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(postBatchSize);
   const [profileDraft, setProfileDraft] = useState<EditableProfile>(() => editableProfile(defaultConfig));
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const folder = useRef<HTMLInputElement>(null);
   const archiveFiles = useRef<HTMLInputElement>(null);
+  const feedEnd = useRef<HTMLDivElement>(null);
 
   async function load() {
     const [postsResponse, configResponse, framesResponse, galleryResponse] = await Promise.all([
@@ -677,6 +680,18 @@ export default function Page() {
   const visible = posts.filter(post => (
     (view !== 'saved' || post.favorite) && `${post.caption} ${post.date}`.toLowerCase().includes(search.toLowerCase())
   ));
+  const renderedPosts = visible.slice(0, visibleCount);
+  useEffect(() => {
+    const target = feedEnd.current;
+    if (!target || visibleCount >= visible.length || view === 'gallery') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setVisibleCount(count => Math.min(count + postBatchSize, visible.length));
+      }
+    }, { rootMargin: '800px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [visibleCount, visible.length, view]);
   const used = posts.reduce((total, post) => total + post.bytes, 0);
   const dateFormat = (value: string) => new Date(value).toLocaleDateString(config.locale, { day: 'numeric', month: 'long', year: 'numeric' });
   const photoItems = posts.flatMap(post => post.media.map((key, mediaIndex) => ({ post, key, mediaIndex })));
@@ -783,7 +798,7 @@ export default function Page() {
         </div>
         <div className="toolbar-right">
           {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('feed');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
-        <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => setSearch(event.target.value)}/></label>
+        <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(postBatchSize); }}/></label>
         </div>
       </div>
       {error && <p className="notice">{error}</p>}
@@ -797,12 +812,12 @@ export default function Page() {
       </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
         {visible.length
           ? view === 'grid'
-            ? visible.map(post => <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
+            ? renderedPosts.map(post => <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
               <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
               {post.source === 'instagram' && <span>↗</span>}
               {post.media.length > 1 && <b>{post.media.length} photos</b>}
             </button>)
-            : visible.map(postCard)
+            : renderedPosts.map(postCard)
           : <div className="empty">
             <div className="camera"><Camera size={37}/></div>
             <span className="eyebrow">{config.isAdmin ? 'MAKE YOURSELF AT HOME' : config.eyebrow}</span>
@@ -814,6 +829,7 @@ export default function Page() {
             </>}
             <div className="emptyfoot"><Lock size={12}/> No algorithm. Just photographs.</div>
           </div>}
+        {visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
       </section>}
       <footer>
         {config.siteName}
