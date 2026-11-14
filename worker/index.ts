@@ -52,6 +52,9 @@ const worker = {
         headers: {"content-type": "text/plain; charset=utf-8", "cache-control": "no-store"},
       });
     }
+    if ((host === "framefeed.co.uk" || host === "www.framefeed.co.uk") && url.pathname.startsWith("/p/")) {
+      return Response.redirect(`${safeJournalOrigin(env.PUBLIC_SITE_URL)}${url.pathname}${url.search}`, 308);
+    }
     if ((host === "framefeed.co.uk" || host === "www.framefeed.co.uk") && url.pathname === "/") {
       url.pathname = "/welcome";
       request = new Request(url.toString(), request);

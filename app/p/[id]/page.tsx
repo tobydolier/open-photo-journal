@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { env } from 'cloudflare:workers';
 import ShareButtons from './share-buttons';
@@ -84,12 +83,12 @@ export default async function PostPage({params}: {params: Promise<{id:string}>})
   return <div className="sharepage">
     <main>
       <div className="sharetop">
-        <Link className="wordmark" href={origin}>
+        <a className="wordmark" href={origin}>
           {config.wordmarkImageUrl
             ? <img className="wordmark-image" src={config.wordmarkImageUrl} alt={config.siteName}/>
             : <>{config.siteName}<span>•</span></>}
-        </Link>
-        <Link className="backlink" href={origin}>← Back to all posts</Link>
+        </a>
+        <a className="backlink" href={origin}>← Back to all posts</a>
       </div>
       <article className="sharecard">
         <div className="sharecardhead">
