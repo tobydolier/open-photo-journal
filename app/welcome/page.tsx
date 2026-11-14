@@ -209,10 +209,18 @@ export default function WelcomePage(){
       </section>
 
       <section className="ff-open-source" id="open-source">
-        <div className="ff-code-card" aria-hidden="true">
-          <span className="ff-code-dots"><i/><i/><i/></span>
-          <pre><code><b>$</b> git clone open-photo-journal{`\n`}<b>$</b> add your own photographs{`\n`}<b>$</b> make it yours <span>✓</span></code></pre>
-          <span className="ff-code-license">MIT licensed</span>
+        <div className="ff-open-visual" aria-label="Copy the template, make it yours, and publish your own journal">
+          <div className="ff-template-card" aria-hidden="true">
+            <span>OPEN PHOTO JOURNAL</span>
+            <div className="ff-template-ui"><i/><i/><i/><b/></div>
+            <small>A complete, empty journal</small>
+          </div>
+          <ol className="ff-open-steps">
+            <li><b>01</b><span><strong>Copy the template</strong>Start with the complete FrameFeed journal.</span></li>
+            <li><b>02</b><span><strong>Make it yours</strong>Add your name, identity and photographs.</span></li>
+            <li><b>03</b><span><strong>Publish independently</strong>Use your own address and hosting.</span></li>
+          </ol>
+          <div className="ff-license-badge"><b>MIT</b><span>Use · change · share</span></div>
         </div>
         <div>
           <p className="ff-eyebrow">OPEN BY DESIGN</p>
