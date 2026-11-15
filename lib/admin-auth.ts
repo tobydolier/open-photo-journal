@@ -94,9 +94,15 @@ export async function createAdminSession(password: string) {
 }
 
 export async function revokeAdminSession(headers:Headers){
-  if(!await validSession(headers))return;
-  const id=cookieValue(headers,COOKIE_NAME)!.split(".")[1];
-  await env.DB!.prepare("DELETE FROM admin_sessions WHERE id=?").bind(id).run();
+  const token=cookieValue(headers,COOKIE_NAME);
+  if(!token)return;
+  const parts=token.split(".");
+  if(parts.length!==4||parts[0]!==SESSION_PREFIX||!/^[a-f0-9]{64}$/.test(parts[1])||!/^\d{13}$/.test(parts[2])||!/^[a-f0-9]{64}$/.test(parts[3]))return;
+  const key=await hmacKey();
+  const signature=hexToBytes(parts[3]);
+  if(!key||!signature||!await crypto.subtle.verify("HMAC",key,signature,new TextEncoder().encode(parts.slice(0,3).join("."))))return;
+  if(!env.DB)throw Error("Database unavailable");
+  await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(parts[1]).run();
 }
 
 export function adminSessionCookie(token: string) {
