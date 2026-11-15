@@ -187,6 +187,37 @@ async function compress(file: File) {
   return new File([output], 'photo.jpg', { type: 'image/jpeg', lastModified: Date.now() });
 }
 
+// A separate square preview; keep the published photograph unchanged.
+async function makeThumbnail(blob:Blob):Promise<Blob>{
+  const url=URL.createObjectURL(blob);
+  const canvas=document.createElement('canvas');
+  try{
+    const image=await new Promise<HTMLImageElement>((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(Error('Could not read photo for thumbnail'));
+      img.src=url;
+    });
+    const size=Math.min(image.naturalWidth,image.naturalHeight);
+    if(!size)throw Error('Invalid photograph dimensions');
+    const edge=Math.min(480,size);
+    canvas.width=edge;canvas.height=edge;
+    const context=canvas.getContext('2d');
+    if(!context)throw Error('Could not create thumbnail');
+    context.drawImage(image,(image.naturalWidth-size)/2,(image.naturalHeight-size)/2,size,size,0,0,edge,edge);
+    const encode=(quality:number)=>new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Could not encode thumbnail')),'image/jpeg',quality));
+    let result=await encode(.76);
+    if(result.size>160000)result=await encode(.60);
+    if(result.size>160000)result=await encode(.42);
+    if(result.type!=='image/jpeg'||result.size>160000)throw Error('Could not make a small enough thumbnail');
+    return result;
+  }finally{URL.revokeObjectURL(url);canvas.width=0;canvas.height=0;}
+}
+
+function thumbnailUrl(key:string,revision=0){
+  return `/api/media/${encodeURIComponent(key)}?thumb=1${revision?'&v='+revision:''}`;
+}
+
 function instagramLocation(...values:unknown[]):PostLocation|undefined {
   let name='';
   let latitude:number|null=null;
@@ -491,6 +522,10 @@ export default function Page() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
+  const [thumbnailRevision,setThumbnailRevision]=useState(0);
+  const [buildingThumbnails,setBuildingThumbnails]=useState(false);
+  const thumbnailStop=useRef(false);
+  const thumbnailRunning=useRef(false);
   const [dragPostId, setDragPostId] = useState<string | null>(null);
   const [dropPostId, setDropPostId] = useState<string | null>(null);
   const [dragPoint,setDragPoint] = useState<{x:number;y:number} | null>(null);
@@ -576,10 +611,56 @@ export default function Page() {
       if(location.latitude!==null)form.set('latitude',String(location.latitude));
       if(location.longitude!==null)form.set('longitude',String(location.longitude));
     }
-    for (const file of photos) form.append('photos', await compress(file));
+    const thumbs:Blob[]=[];
+    for(const file of photos){
+      const photo=await compress(file);
+      form.append('photos',photo);
+      try{thumbs.push(await makeThumbnail(photo));}catch{/* The post can still be published with its original grid fallback. */}
+    }
+    if(thumbs.length===photos.length)for(const thumb of thumbs)form.append('thumbnails',thumb,'thumb.jpg');
     const response = await fetch('/api/posts', { method: 'POST', body: form });
     if (!response.ok) throw Error(await response.text());
     return response.json() as Promise<{ duplicate?: boolean; ok?: boolean }>;
+  }
+
+  async function buildThumbnails(){
+    if(!config.isAdmin||busy||thumbnailRunning.current)return;
+    thumbnailRunning.current=true;thumbnailStop.current=false;
+    setBuildingThumbnails(true);setBusy(true);setStatus('Checking existing thumbnails…');
+    let created=0,failed=0;
+    try{
+      const existing=new Set<string>();
+      let cursor:string|null=null;
+      do{
+        const response=await fetch('/api/thumbnails'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{cache:'no-store'});
+        if(!response.ok)throw Error(await response.text()||'Could not list thumbnails');
+        const result=await response.json() as {keys:string[];cursor:string|null};
+        for(const key of result.keys)existing.add(key);
+        cursor=result.cursor;
+      }while(cursor&&!thumbnailStop.current);
+      const keys=[...new Set(posts.flatMap(post=>post.media))].filter(key=>!existing.has(key));
+      for(let index=0;index<keys.length&&!thumbnailStop.current;index++){
+        const key=keys[index];
+        setStatus(`Building thumbnails: ${index+1} of ${keys.length} · ${created} saved`);
+        try{
+          const source=await fetch('/api/media/'+encodeURIComponent(key));
+          if(!source.ok)throw Error('Photo unavailable');
+          const thumb=await makeThumbnail(await source.blob());
+          const response=await fetch('/api/thumbnails?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'image/jpeg'},body:thumb});
+          if(response.status===401||response.status===403)throw Error('Owner session expired');
+          if(!response.ok)throw Error('Could not save thumbnail');
+          created++;
+        }catch(cause){
+          if(cause instanceof Error&&cause.message==='Owner session expired')throw cause;
+          failed++;
+        }
+      }
+      setStatus(thumbnailStop.current?`Paused. ${created} thumbnails saved. Run again to continue.`:failed?`${created} thumbnails saved; ${failed} failed. Run again to retry.`:created?`${created} thumbnails saved. Your grid is ready.`:'All photographs already have thumbnails.');
+    }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
+    finally{
+      if(created)setThumbnailRevision(value=>value+1);
+      thumbnailRunning.current=false;setBuildingThumbnails(false);setBusy(false);
+    }
   }
 
   async function publish() {
@@ -1121,6 +1202,10 @@ export default function Page() {
         <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(postBatchSize); }}/></label>
         </div>
       </div>
+      {config.isAdmin&&view==='grid'&&posts.length>0&&<div className="thumbnail-tools">
+        <button type="button" disabled={busy&&!buildingThumbnails} onClick={()=>{if(buildingThumbnails){thumbnailStop.current=true;setStatus('Pausing after the current photograph…');}else void buildThumbnails();}}>{buildingThumbnails?'Pause thumbnails':'Build thumbnails'}</button>
+        <small>{buildingThumbnails?'Keep this page open while thumbnails are generated.':'Optimise older photographs for faster grid loading.'}</small>
+      </div>}
       {arrangingPosts && <div className="arrange-help" role="status"><b>Arrange your feed</b><span>Drag a photo using its grip, or use the arrows. More photos load as you scroll. Each move saves automatically.</span></div>}
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
@@ -1147,7 +1232,7 @@ export default function Page() {
           ? view === 'grid'
             ? renderedPosts.map((post,index) => arrangingPosts
               ? <div key={post.id} data-arrange-post={post.id} className={`arrange-tile ${dragPostId===post.id?'arrange-source':''} ${dropPostId===post.id&&dragPostId!==post.id?'arrange-target':''}`}>
-                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption||'Photo '+(index+1)} width={160} height={160} loading="lazy" decoding="async" draggable={false}/>
+                  <img src={thumbnailUrl(post.media[0],thumbnailRevision)} alt={post.caption||'Photo '+(index+1)} width={160} height={160} loading="lazy" decoding="async" draggable={false}/>
                   <div className="arrange-number">{index+1}</div>
                   <button className="arrange-grip" type="button" aria-label={`Drag post ${index+1}`} title="Drag to rearrange" disabled={busy} onPointerDown={event=>startDrag(event,post.id)} onPointerMove={trackDrag} onPointerUp={event=>finishDrag(event,true)} onPointerCancel={event=>finishDrag(event,false)} onLostPointerCapture={event=>finishDrag(event,false)}>⠿</button>
                   <div className="arrange-arrows">
@@ -1157,7 +1242,7 @@ export default function Page() {
                   </div>
                 </div>
               : <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
-                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
+                  <img src={thumbnailUrl(post.media[0],thumbnailRevision)} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
                   {post.source === 'instagram' && <span>↗</span>}
                   {post.media.length > 1 && <b>{post.media.length} photos</b>}
                 </button>)
@@ -1176,7 +1261,7 @@ export default function Page() {
         {visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
       </section>}
       {arrangingPosts && dragPostId && dragPoint && <div className="arrange-ghost" style={{left:dragPoint.x,top:dragPoint.y}} aria-hidden="true">
-        <img src={`/api/media/${encodeURIComponent(posts.find(post=>post.id===dragPostId)?.media[0]||'')}`} alt=""/>
+        <img src={thumbnailUrl(posts.find(post=>post.id===dragPostId)?.media[0]||'',thumbnailRevision)} alt=""/>
       </div>}
       <footer>
         {config.siteName}

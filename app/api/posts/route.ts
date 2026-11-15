@@ -49,6 +49,14 @@ export async function POST(request:Request){
     return Response.json({duplicate:true,locationUpdated:locationProvided});
   }
   const files=form.getAll("photos") as File[];
+  const thumbnails=form.getAll("thumbnails");
+  if(thumbnails.length && thumbnails.length!==files.length)return new Response("Invalid thumbnail count",{status:400});
+  for(const thumb of thumbnails){
+    if(!(thumb instanceof File)||thumb.type!=="image/jpeg"||thumb.size<5||thumb.size>160000)return new Response("Invalid thumbnail",{status:400});
+    const first=new Uint8Array(await thumb.slice(0,3).arrayBuffer());
+    const last=new Uint8Array(await thumb.slice(-2).arrayBuffer());
+    if(first[0]!==255||first[1]!==216||first[2]!==255||last[0]!==255||last[1]!==217)return new Response("Invalid thumbnail JPEG",{status:400});
+  }
   if(!files.length||files.length>20)return new Response("Choose 1–20 photos",{status:400});
   let size=0;
   const mediaTypes:string[]=[];
@@ -64,11 +72,18 @@ export async function POST(request:Request){
   const limit=Number(env.STORAGE_LIMIT_BYTES)||8e9;
   if((used?.n||0)+size>limit)return new Response("Storage safety limit reached",{status:400});
   const keys:string[]=[];
+  const thumbKeys:string[]=[];
   try{
     for(let index=0;index<files.length;index++){
       const key=`${id}-${index}`;
       await env.BUCKET!.put(key,await files[index].arrayBuffer(),{httpMetadata:{contentType:mediaTypes[index]}});
       keys.push(key);
+      const thumb=thumbnails[index];
+      if(thumb instanceof File){
+        const thumbKey="thumb/v1/"+key;
+        await env.BUCKET!.put(thumbKey,await thumb.arrayBuffer(),{httpMetadata:{contentType:"image/jpeg"}});
+        thumbKeys.push(thumbKey);
+      }
     }
     const statements=[env.DB!.prepare("INSERT INTO posts(id,caption,date,source,media,bytes) VALUES(?,?,?,?,?,?)")
       .bind(id,String(form.get("caption")||"").slice(0,20000),String(form.get("date")||new Date().toISOString()),form.get("source")==="instagram"?"instagram":"native",JSON.stringify(keys),size)];
@@ -77,7 +92,7 @@ export async function POST(request:Request){
     await env.DB!.batch(statements);
     return Response.json({ok:true});
   }catch{
-    await Promise.all(keys.map(key=>env.BUCKET!.delete(key)));
+    await Promise.all([...keys,...thumbKeys].map(key=>env.BUCKET!.delete(key)));
     return new Response("Could not save post. Please retry.",{status:500});
   }
 }
@@ -101,7 +116,7 @@ export async function DELETE(request:Request){
   const post=await env.DB!.prepare("SELECT media FROM posts WHERE id=?").bind(id).first<{media:string}>();
   if(post){
     const keys=JSON.parse(post.media) as string[];
-    await Promise.all(keys.map(key=>env.BUCKET!.delete(key)));
+    await Promise.all(keys.flatMap(key=>[key,"thumb/v1/"+key]).map(key=>env.BUCKET!.delete(key)));
     try{await env.DB!.prepare("DELETE FROM featured_photos WHERE post_id=?").bind(id).run();}catch{}
     try{await env.DB!.prepare("DELETE FROM photo_frames WHERE post_id=?").bind(id).run();}catch{}
     try{await env.DB!.prepare("DELETE FROM post_locations WHERE post_id=?").bind(id).run();}catch{}
