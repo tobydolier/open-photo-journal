@@ -9,12 +9,13 @@ export async function PUT(request:Request) {
   let body:unknown;
   try{
     const raw=await request.text();
-    if(raw.length>1100000)return new Response("Order too large",{status:413});
+    if(raw.length>2100000)return new Response("Order too large",{status:413});
     body=JSON.parse(raw);
   }catch{return new Response("Invalid JSON",{status:400});}
   const {ids,previousIds}=(body||{}) as {ids?:unknown;previousIds?:unknown};
   const valid=(v:unknown):v is string[]=>Array.isArray(v)&&v.length<=10000&&v.every(x=>typeof x==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(x))&&new Set(v).size===v.length;
-  if(!valid(ids)||!valid(previousIds)||ids.length!==previousIds.length||!ids.every(id=>previousIds.includes(id)))
+  const sameMembers=(a:string[],b:string[])=>{const members=new Set(b);return a.every(id=>members.has(id));};
+  if(!valid(ids)||!valid(previousIds)||ids.length!==previousIds.length||!sameMembers(ids,previousIds))
     return new Response("Invalid post order",{status:400});
   const db=env.DB;
   if(!db)return new Response("Database unavailable",{status:503});
@@ -31,7 +32,7 @@ export async function PUT(request:Request) {
     const prior=JSON.stringify(previousIds);
     const result=await db.prepare(`WITH proposed AS (
       SELECT value AS id,CAST(key AS INTEGER) AS position FROM json_each(?1)
-    ), current_sequence AS (
+    ), current_sequence AS MATERIALIZED (
       SELECT json_group_array(id) AS ids FROM (
         SELECT id FROM posts ORDER BY CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END,sort_order,date DESC,id DESC
       )
