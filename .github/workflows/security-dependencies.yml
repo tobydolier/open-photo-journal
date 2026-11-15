@@ -30,7 +30,7 @@ jobs:
           Object.assign(p.dependencies,{react:'19.3.1','react-dom':'19.3.1',next:'16.4.5'});
           Object.assign(p.devDependencies,{'react-server-dom-webpack':'19.3.1','@vitejs/plugin-rsc':'0.5.39','@vitejs/plugin-react':'6.2.1','eslint-config-next':'16.4.5',vinext:'1.4.4',vite:'8.1.6'});
           p.dependencies.zod='4.6.6';
-          const overrides={'miniflare>sharp':'0.35.5','undici@>=7.0.0 <7.30.1':'7.30.1','ws@>=8.0.0 <8.21.0':'8.21.0','brace-expansion@<1.1.20':'1.1.20','brace-expansion@>=3.0.0 <5.0.11':'5.0.11','js-yaml@>=4.0.0 <4.3.2':'4.3.2','browserslist@<=4.28.6':'4.28.7','source-map-js@>=1.0.0 <1.2.2':'1.2.2'};
+          const overrides={'miniflare>sharp':'0.35.5','@vercel/og>sharp':'0.35.5','eslint-plugin-react-hooks>zod':'4.6.6','zod-validation-error>zod':'4.6.6','undici@>=7.0.0 <7.30.1':'7.30.1','ws@>=8.0.0 <8.21.0':'8.21.0','brace-expansion@<1.1.20':'1.1.20','brace-expansion@>=3.0.0 <5.0.11':'5.0.11','js-yaml@>=4.0.0 <4.3.2':'4.3.2','browserslist@<=4.28.6':'4.28.7','source-map-js@>=1.0.0 <1.2.2':'1.2.2'};
           p.overrides={...p.overrides,...overrides};
           const workspace=fs.readFileSync('pnpm-workspace.yaml','utf8').replace(/\noverrides:[\s\S]*$/,'');
           fs.writeFileSync('pnpm-workspace.yaml',workspace+'\n overrides:\n'.replace(' overrides:','overrides:')+Object.entries(overrides).map(([k,v])=>'  '+JSON.stringify(k)+': '+JSON.stringify(v)).join('\n')+'\n');
@@ -43,9 +43,11 @@ jobs:
         env:
           FRAMEFEED_DEPLOY: '1'
       - name: Audit complete dependency tree
-        run: pnpm audit --audit-level=high
+        run: |
+          pnpm audit --json > security-audit.json || true
+          pnpm audit --audit-level=high
       - name: Save candidate manifest and lockfile for review
-        if: success()
+        if: always() && hashFiles('security-audit.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: security-dependency-candidate
@@ -53,4 +55,5 @@ jobs:
             package.json
             pnpm-lock.yaml
             pnpm-workspace.yaml
+            security-audit.json
           retention-days: 7
