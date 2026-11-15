@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      framework:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-server-dom-*"
+          - "next"
+          - "eslint-config-next"
+          - "@vitejs/*"
+          - "vite"
+          - "vinext"
+          - "@cloudflare/vite-plugin"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
