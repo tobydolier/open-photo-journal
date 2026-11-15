@@ -998,7 +998,7 @@ export default function Page() {
     (view !== 'saved' || post.favorite) && `${post.caption} ${post.date}`.toLowerCase().includes(search.toLowerCase())
   ));
   const arrangingPosts = config.isAdmin && reordering && view === 'grid' && !search;
-  const renderedPosts = arrangingPosts ? visible : visible.slice(0, visibleCount);
+  const renderedPosts = visible.slice(0, visibleCount);
   useEffect(() => {
     const target = feedEnd.current;
     if (!target || visibleCount >= visible.length || view === 'gallery') return;
@@ -1009,7 +1009,7 @@ export default function Page() {
     }, { rootMargin: '800px 0px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [visibleCount, visible.length, view]);
+  }, [visibleCount, visible.length, view, arrangingPosts]);
   const used = posts.reduce((total, post) => total + post.bytes, 0);
   const dateFormat = (value: string) => new Date(value).toLocaleDateString(config.locale, { day: 'numeric', month: 'long', year: 'numeric' });
   const photoItems = posts.flatMap(post => post.media.map((key, mediaIndex) => ({ post, key, mediaIndex })));
@@ -1117,11 +1117,11 @@ export default function Page() {
           <button className={view === 'gallery' ? 'on' : ''} onClick={() => setView('gallery')}><Images size={16}/> Gallery</button>
         </div>
         <div className="toolbar-right">
-          {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('grid');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
+          {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('grid');setSearch('');setVisibleCount(postBatchSize);}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
         <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(postBatchSize); }}/></label>
         </div>
       </div>
-      {arrangingPosts && <div className="arrange-help" role="status"><b>Arrange your feed</b><span>Drag a photo using its grip, or use the arrows. Each move saves automatically. Visitors see your chosen order.</span></div>}
+      {arrangingPosts && <div className="arrange-help" role="status"><b>Arrange your feed</b><span>Drag a photo using its grip, or use the arrows. More photos load as you scroll. Each move saves automatically.</span></div>}
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
       {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
@@ -1142,12 +1142,12 @@ export default function Page() {
           </div>
         </div>
         {galleryItems.length > 3 && <p className="gallery-guide">Swipe or scroll sideways to walk through the gallery</p>}
-      </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
+      </section> : <section className={view === 'grid' ? (arrangingPosts ? 'grid arrange-grid' : 'grid') : 'feed'}>
         {visible.length
           ? view === 'grid'
             ? renderedPosts.map((post,index) => arrangingPosts
               ? <div key={post.id} data-arrange-post={post.id} className={`arrange-tile ${dragPostId===post.id?'arrange-source':''} ${dropPostId===post.id&&dragPostId!==post.id?'arrange-target':''}`}>
-                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption||'Photo '+(index+1)} loading="lazy" decoding="async" draggable={false}/>
+                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption||'Photo '+(index+1)} width={160} height={160} loading="lazy" decoding="async" draggable={false}/>
                   <div className="arrange-number">{index+1}</div>
                   <button className="arrange-grip" type="button" aria-label={`Drag post ${index+1}`} title="Drag to rearrange" disabled={busy} onPointerDown={event=>startDrag(event,post.id)} onPointerMove={trackDrag} onPointerUp={event=>finishDrag(event,true)} onPointerCancel={event=>finishDrag(event,false)} onLostPointerCapture={event=>finishDrag(event,false)}>⠿</button>
                   <div className="arrange-arrows">
@@ -1173,7 +1173,7 @@ export default function Page() {
             </>}
             <div className="emptyfoot"><Lock size={12}/> No algorithm. Just photographs.</div>
           </div>}
-        {!arrangingPosts && visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
+        {visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
       </section>}
       {arrangingPosts && dragPostId && dragPoint && <div className="arrange-ghost" style={{left:dragPoint.x,top:dragPoint.y}} aria-hidden="true">
         <img src={`/api/media/${encodeURIComponent(posts.find(post=>post.id===dragPostId)?.media[0]||'')}`} alt=""/>
