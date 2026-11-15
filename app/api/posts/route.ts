@@ -3,14 +3,11 @@ import { isAdminRequest } from "../../../lib/admin-auth";
 import { ensurePostLocationsTable, normalisePostLocation, savePostLocation } from "../../../lib/post-locations";
 
 const idPattern=/^[a-zA-Z0-9_-]{1,100}$/;
-const supportedImageTypes=new Set(["image/jpeg","image/webp","image/png"]);
 
 async function detectedImageType(file:File){
-  const declared=file.type.toLowerCase();
-  if(supportedImageTypes.has(declared))return declared;
   const bytes=new Uint8Array(await file.slice(0,12).arrayBuffer());
   if(bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return "image/jpeg";
-  if(bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47)return "image/png";
+  if(bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)return "image/png";
   if(String.fromCharCode(...bytes.slice(0,4))==="RIFF"&&String.fromCharCode(...bytes.slice(8,12))==="WEBP")return "image/webp";
   return "";
 }
@@ -48,7 +45,9 @@ export async function POST(request:Request){
     if(locationProvided)await savePostLocation(id,location);
     return Response.json({duplicate:true,locationUpdated:locationProvided});
   }
-  const files=form.getAll("photos") as File[];
+  const entries=form.getAll("photos");
+  if(!entries.length||entries.length>20||entries.some(file=>!(file instanceof File)))return new Response("Choose 1–20 photos",{status:400});
+  const files=entries as File[];
   const thumbnails=form.getAll("thumbnails");
   if(thumbnails.length && thumbnails.length!==files.length)return new Response("Invalid thumbnail count",{status:400});
   for(const thumb of thumbnails){
@@ -70,7 +69,8 @@ export async function POST(request:Request){
   }
   const used=await env.DB!.prepare("SELECT COALESCE(SUM(bytes),0) AS n FROM posts").first<{n:number}>();
   const limit=Number(env.STORAGE_LIMIT_BYTES)||8e9;
-  if((used?.n||0)+size>limit)return new Response("Storage safety limit reached",{status:400});
+  const extra=thumbnails.reduce((sum,thumb)=>sum+(thumb instanceof File?thumb.size:0),0);
+  if((used?.n||0)+size+extra>limit)return new Response("Storage safety limit reached",{status:400});
   const keys:string[]=[];
   const thumbKeys:string[]=[];
   try{
