@@ -1095,7 +1095,11 @@ export default function Page() {
   }
 
   async function logout() {
-    await fetch('/api/admin/session', { method: 'DELETE' });
+    try{
+      const response=await fetch('/api/admin/session',{method:'DELETE'});
+      if(!response.ok)throw Error(await response.text()||'Could not sign out');
+    }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));return;}
+    setReordering(false);
     setView('feed');
     setStatus('');
     await load();
