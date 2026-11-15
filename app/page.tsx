@@ -501,6 +501,9 @@ function GalleryArtwork({
 export default function Page() {
   const [config, setConfig] = useState<PublicSiteConfig>(defaultConfig);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [storageUsage,setStorageUsage]=useState<{photos:number;thumbnails:number;other:number}|null>(null);
+  const [storageUnavailable,setStorageUnavailable]=useState(false);
+  const storageRequest=useRef(0);
   const [view, setView] = useState('feed');
   const [modal, setModal] = useState('');
   const [search, setSearch] = useState('');
@@ -544,6 +547,26 @@ export default function Page() {
   const profileDrag = useRef<{pointerId:number;startX:number;startY:number;x:number;y:number} | null>(null);
   const preservingMounts = useRef(new Set<string>());
 
+  async function refreshStorage(isAdmin:boolean){
+    const requestId=++storageRequest.current;
+    if(!isAdmin){setStorageUsage(null);setStorageUnavailable(false);return;}
+    try{
+      const totals={photos:0,thumbnails:0,other:0};
+      let cursor:string|null=null;
+      do{
+        const response=await fetch('/api/storage-usage'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{cache:'no-store'});
+        if(!response.ok)throw Error('Storage unavailable');
+        const data=await response.json() as {photos:number;thumbnails:number;other:number;cursor:string|null};
+        totals.photos+=data.photos;totals.thumbnails+=data.thumbnails;totals.other+=data.other;
+        cursor=data.cursor;
+        if(requestId!==storageRequest.current)return;
+      }while(cursor);
+      setStorageUsage(totals);setStorageUnavailable(false);
+    }catch{
+      if(requestId===storageRequest.current){setStorageUsage(null);setStorageUnavailable(true);}
+    }
+  }
+
   async function load() {
     const [postsResponse, configResponse, framesResponse, galleryResponse] = await Promise.all([
       fetch('/api/posts'),
@@ -554,7 +577,9 @@ export default function Page() {
     if (!postsResponse.ok) throw Error('Could not load the photos. Please refresh.');
     if (!configResponse.ok) throw Error('Could not load the journal settings. Please refresh.');
     setPosts(await postsResponse.json());
-    setConfig(await configResponse.json());
+    const nextConfig=await configResponse.json() as PublicSiteConfig;
+    setConfig(nextConfig);
+    void refreshStorage(nextConfig.isAdmin);
     if (framesResponse.ok) {
       const data = await framesResponse.json() as { frames?: PhotoFrame[] };
       setPhotoFrames(data.frames || []);
@@ -659,6 +684,7 @@ export default function Page() {
     }catch(cause){setStatus(cause instanceof Error?cause.message:String(cause));}
     finally{
       if(created)setThumbnailRevision(value=>value+1);
+      void refreshStorage(config.isAdmin);
       thumbnailRunning.current=false;setBuildingThumbnails(false);setBusy(false);
     }
   }
@@ -1091,7 +1117,9 @@ export default function Page() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [visibleCount, visible.length, view, arrangingPosts]);
-  const used = posts.reduce((total, post) => total + post.bytes, 0);
+  const used=storageUsage?storageUsage.photos+storageUsage.thumbnails+storageUsage.other:0;
+  const storageSize=(bytes:number)=>bytes>=1e9?(bytes/1e9).toFixed(2)+' GB':bytes>=1e6?(bytes/1e6).toFixed(1)+' MB':bytes>=1000?(bytes/1000).toFixed(1)+' KB':bytes+' B';
+  const storagePercent=Math.max(0,Math.min(100,used/config.storageLimitBytes*100));
   const dateFormat = (value: string) => new Date(value).toLocaleDateString(config.locale, { day: 'numeric', month: 'long', year: 'numeric' });
   const photoItems = posts.flatMap(post => post.media.map((key, mediaIndex) => ({ post, key, mediaIndex })));
   const openPhoto = (post: Post, mediaIndex: number) => {
@@ -1158,9 +1186,9 @@ export default function Page() {
       <div className="asidebottom">
         <div className="privacy"><Lock size={15}/><div><b>{config.visibilityLabel}</b><small>{config.siteDescription}</small></div></div>
         {config.isAdmin && <div className="storage">
-          <span>Photo storage <b>{(used / 1e9).toFixed(2)} / {(config.storageLimitBytes / 1e9).toFixed(0)} GB</b></span>
-          <div><i style={{ width: `${Math.max(1, used / config.storageLimitBytes * 100)}%` }}/></div>
-          <small>Configurable upload safety limit · compressed photos</small>
+          <span>Storage used <b>{storageUsage?storageSize(used):'—'}</b></span>
+          <div role="progressbar" aria-label="Storage usage against configured limit" aria-valuemin={0} aria-valuemax={100} aria-valuenow={storageUsage?Math.round(storagePercent):undefined}><i style={{width:`${storagePercent}%`}}/></div>
+          {storageUsage?<small>Photos {storageSize(storageUsage.photos)} · Thumbnails {storageSize(storageUsage.thumbnails)} · Other {storageSize(storageUsage.other)}<br/>Configured limit: {storageSize(config.storageLimitBytes)}</small>:<small>{storageUnavailable?'Storage usage unavailable. Refresh to retry.':'Checking storage…'}</small>}
         </div>}
         <div className="account">
           <ProfileAvatar config={config}/>
