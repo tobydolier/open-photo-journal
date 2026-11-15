@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import {
   Camera,
   Check,
@@ -491,6 +491,11 @@ export default function Page() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerMountColour, setViewerMountColour] = useState('');
   const [reordering, setReordering] = useState(false);
+  const [dragPostId, setDragPostId] = useState<string | null>(null);
+  const [dropPostId, setDropPostId] = useState<string | null>(null);
+  const [dragPoint,setDragPoint] = useState<{x:number;y:number} | null>(null);
+  const postDrag = useRef<{id:string;pointer:number;target:string|null;x:number;y:number;raf:number} | null>(null);
+  const orderingBusy = useRef(false);
   const [visibleCount, setVisibleCount] = useState(postBatchSize);
   const [profileDraft, setProfileDraft] = useState<EditableProfile>(() => editableProfile(defaultConfig));
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -765,30 +770,92 @@ export default function Page() {
     }
   }
 
-  async function movePost(id: string, change: number) {
-    if (!config.isAdmin || search || busy) return;
-    const oldIndex = posts.findIndex(post => post.id === id);
-    const newIndex = oldIndex + change;
-    if (oldIndex < 0 || newIndex < 0 || newIndex >= posts.length) return;
-    const reordered = [...posts];
-    [reordered[oldIndex], reordered[newIndex]] = [reordered[newIndex], reordered[oldIndex]];
+  async function movePostTo(id:string, targetId:string) {
+    if(!config.isAdmin || search || busy || orderingBusy.current || id===targetId)return;
+    const from=posts.findIndex(post=>post.id===id);
+    const to=posts.findIndex(post=>post.id===targetId);
+    if(from<0||to<0)return;
+    const previous=posts;
+    const reordered=[...posts];
+    const [moved]=reordered.splice(from,1);
+    reordered.splice(to,0,moved);
+    orderingBusy.current=true;
     setBusy(true);
     setPosts(reordered);
-    try {
-      const response = await fetch('/api/posts/order', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ids: reordered.map(post => post.id)}),
+    try{
+      const response=await fetch('/api/posts/order',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ids:reordered.map(post=>post.id),previousIds:previous.map(post=>post.id)}),
       });
-      if (!response.ok) throw Error(await response.text() || 'Could not save order');
+      if(!response.ok){
+        if(response.status===409){
+          await load();
+          setStatus('The gallery changed elsewhere. Please try arranging it again.');
+          return;
+        }
+        throw Error(await response.text()||'Could not save order');
+      }
       setStatus('Gallery order saved.');
-    } catch (cause) {
-      setPosts(posts);
-      setStatus(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
+    }catch(cause){
+      setPosts(previous);
+      setStatus(cause instanceof Error?cause.message:String(cause));
+    }finally{orderingBusy.current=false;setBusy(false);}
   }
+
+  function movePost(id:string,change:number){
+    const index=posts.findIndex(post=>post.id===id);
+    const target=posts[index+change];
+    if(index>=0&&target)void movePostTo(id,target.id);
+  }
+
+  function findDropTarget(x:number,y:number){
+    const tile=document.elementFromPoint(x,y)?.closest<HTMLElement>('[data-arrange-post]');
+    return tile?.dataset.arrangePost||null;
+  }
+
+  function trackDrag(event:ReactPointerEvent<HTMLButtonElement>){
+    const drag=postDrag.current;
+    if(!drag||event.pointerId!==drag.pointer)return;
+    drag.x=event.clientX;drag.y=event.clientY;
+    setDragPoint({x:drag.x,y:drag.y});
+    drag.target=findDropTarget(drag.x,drag.y);
+    setDropPostId(drag.target);
+  }
+
+  function startDrag(event:ReactPointerEvent<HTMLButtonElement>,id:string){
+    if(!config.isAdmin||busy||orderingBusy.current||!event.isPrimary||event.button!==0||postDrag.current)return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const drag={id,pointer:event.pointerId,target:id as string|null,x:event.clientX,y:event.clientY,raf:0};
+    postDrag.current=drag;setDragPostId(id);setDropPostId(id);setDragPoint({x:drag.x,y:drag.y});
+    const tick=()=>{
+      if(postDrag.current!==drag)return;
+      const edge=90;
+      const amount=drag.y<edge ? -Math.ceil((edge-drag.y)/6) : drag.y>window.innerHeight-edge ? Math.ceil((drag.y-window.innerHeight+edge)/6) : 0;
+      if(amount){
+        window.scrollBy(0,amount);
+        drag.target=findDropTarget(drag.x,drag.y);
+        setDropPostId(drag.target);
+      }
+      drag.raf=window.requestAnimationFrame(tick);
+    };
+    drag.raf=window.requestAnimationFrame(tick);
+  }
+
+  function finishDrag(event:ReactPointerEvent<HTMLButtonElement>,commit:boolean){
+    const drag=postDrag.current;
+    if(!drag||event.pointerId!==drag.pointer)return;
+    const target=commit?findDropTarget(event.clientX,event.clientY):null;
+    window.cancelAnimationFrame(drag.raf);
+    postDrag.current=null;setDragPostId(null);setDropPostId(null);setDragPoint(null);
+    if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+    if(target&&target!==drag.id)void movePostTo(drag.id,target);
+  }
+
+  useEffect(()=>()=>{
+    if(postDrag.current)window.cancelAnimationFrame(postDrag.current.raf);
+    postDrag.current=null;
+  },[]);
 
   async function setPhotoFrame(post: Post, mediaKey: string, style: FrameStyle, mountColour='') {
     try {
@@ -930,7 +997,8 @@ export default function Page() {
   const visible = posts.filter(post => (
     (view !== 'saved' || post.favorite) && `${post.caption} ${post.date}`.toLowerCase().includes(search.toLowerCase())
   ));
-  const renderedPosts = visible.slice(0, visibleCount);
+  const arrangingPosts = config.isAdmin && reordering && view === 'grid' && !search;
+  const renderedPosts = arrangingPosts ? visible : visible.slice(0, visibleCount);
   useEffect(() => {
     const target = feedEnd.current;
     if (!target || visibleCount >= visible.length || view === 'gallery') return;
@@ -1049,10 +1117,11 @@ export default function Page() {
           <button className={view === 'gallery' ? 'on' : ''} onClick={() => setView('gallery')}><Images size={16}/> Gallery</button>
         </div>
         <div className="toolbar-right">
-          {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('feed');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
+          {config.isAdmin && <button className={reordering ? 'on order-toggle' : 'order-toggle'} type="button" aria-pressed={reordering} onClick={() => {setReordering(!reordering);setView('grid');setSearch('');}}>{reordering ? 'Done ordering' : 'Arrange posts'}</button>}
         <label><Search size={16}/><input placeholder="Find a memory…" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(postBatchSize); }}/></label>
         </div>
       </div>
+      {arrangingPosts && <div className="arrange-help" role="status"><b>Arrange your feed</b><span>Drag a photo using its grip, or use the arrows. Each move saves automatically. Visitors see your chosen order.</span></div>}
       {error && <p className="notice">{error}</p>}
       {status && <div className="notice" role="status">{status}<button aria-label="Dismiss" onClick={() => setStatus('')} disabled={busy}><X size={14}/></button></div>}
       {view === 'gallery' ? <section className="virtual-gallery" aria-label="Curated virtual gallery">
@@ -1076,11 +1145,22 @@ export default function Page() {
       </section> : <section className={view === 'grid' ? 'grid' : 'feed'}>
         {visible.length
           ? view === 'grid'
-            ? renderedPosts.map(post => <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
-              <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
-              {post.source === 'instagram' && <span>↗</span>}
-              {post.media.length > 1 && <b>{post.media.length} photos</b>}
-            </button>)
+            ? renderedPosts.map((post,index) => arrangingPosts
+              ? <div key={post.id} data-arrange-post={post.id} className={`arrange-tile ${dragPostId===post.id?'arrange-source':''} ${dropPostId===post.id&&dragPostId!==post.id?'arrange-target':''}`}>
+                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption||'Photo '+(index+1)} loading="lazy" decoding="async" draggable={false}/>
+                  <div className="arrange-number">{index+1}</div>
+                  <button className="arrange-grip" type="button" aria-label={`Drag post ${index+1}`} title="Drag to rearrange" disabled={busy} onPointerDown={event=>startDrag(event,post.id)} onPointerMove={trackDrag} onPointerUp={event=>finishDrag(event,true)} onPointerCancel={event=>finishDrag(event,false)} onLostPointerCapture={event=>finishDrag(event,false)}>⠿</button>
+                  <div className="arrange-arrows">
+                    <button type="button" aria-label={`Move post ${index+1} earlier`} disabled={busy||index===0} onClick={()=>movePost(post.id,-1)}>↑</button>
+                    <button type="button" aria-label={`Move post ${index+1} later`} disabled={busy||index===posts.length-1} onClick={()=>movePost(post.id,1)}>↓</button>
+                    <button type="button" aria-label={`Move post ${index+1} to first`} title="Move to first" disabled={busy||index===0} onClick={()=>void movePostTo(post.id,posts[0].id)}>⇈</button>
+                  </div>
+                </div>
+              : <button className="tile" key={post.id} onClick={() => openPhoto(post, 0)}>
+                  <img src={`/api/media/${encodeURIComponent(post.media[0])}`} alt={post.caption || 'View photo'} loading="lazy" decoding="async"/>
+                  {post.source === 'instagram' && <span>↗</span>}
+                  {post.media.length > 1 && <b>{post.media.length} photos</b>}
+                </button>)
             : renderedPosts.map(postCard)
           : <div className="empty">
             <div className="camera"><Camera size={37}/></div>
@@ -1093,8 +1173,11 @@ export default function Page() {
             </>}
             <div className="emptyfoot"><Lock size={12}/> No algorithm. Just photographs.</div>
           </div>}
-        {visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
+        {!arrangingPosts && visibleCount < visible.length && <div ref={feedEnd} className="feed-loader" aria-label="Loading more posts"><span/></div>}
       </section>}
+      {arrangingPosts && dragPostId && dragPoint && <div className="arrange-ghost" style={{left:dragPoint.x,top:dragPoint.y}} aria-hidden="true">
+        <img src={`/api/media/${encodeURIComponent(posts.find(post=>post.id===dragPostId)?.media[0]||'')}`} alt=""/>
+      </div>}
       <footer>
         {config.siteName}
         <span>
