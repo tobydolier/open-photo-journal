@@ -1,0 +1,46 @@
+name: Security dependency candidate
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/security-dependencies.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve patched framework versions without changing production
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          Object.assign(p.dependencies,{react:'19.3.1','react-dom':'19.3.1',next:'16.4.5'});
+          Object.assign(p.devDependencies,{'react-server-dom-webpack':'19.3.1','@vitejs/plugin-rsc':'0.5.39','@vitejs/plugin-react':'6.3.0','eslint-config-next':'16.4.5',vinext:'1.4.5'});
+          fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          EOF
+          pnpm install --no-frozen-lockfile
+      - name: Build patched dependency candidate
+        run: pnpm run build
+        env:
+          FRAMEFEED_DEPLOY: '1'
+      - name: Audit complete dependency tree
+        run: pnpm audit --audit-level=high
+      - name: Save candidate manifest and lockfile for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-dependency-candidate
+          path: |
+            package.json
+            pnpm-lock.yaml
+          retention-days: 7
