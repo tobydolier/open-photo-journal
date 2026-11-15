@@ -1,12 +1,15 @@
 name: Verify FrameFeed standalone build
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches:
       - prepare-framefeed-cloudflare
       - main
     paths:
       - 'app/**'
+      - 'lib/**'
       - 'cloudflare-env.d.ts'
       - 'drizzle/**'
       - 'vite.config.ts'
