@@ -59,7 +59,16 @@ const worker = {
       url.pathname = "/welcome";
       request = new Request(url.toString(), request);
     }
-    return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+    const response=await runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+    const headers=new Headers(response.headers);
+    headers.set("X-Content-Type-Options","nosniff");
+    headers.set("X-Frame-Options","DENY");
+    headers.set("Referrer-Policy","strict-origin-when-cross-origin");
+    headers.set("Permissions-Policy","camera=(), microphone=(), payment=(), geolocation=(self)");
+    if(url.protocol==="https:")headers.set("Strict-Transport-Security","max-age=31536000");
+    // Start with a conservative CSP; do not block framework-generated scripts or Turnstile.
+    if(!headers.has("Content-Security-Policy"))headers.set("Content-Security-Policy","object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   },
 };
 
