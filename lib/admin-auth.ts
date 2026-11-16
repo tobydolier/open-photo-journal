@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 const COOKIE_NAME = "photo_journal_admin";
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_PREFIX = 'v2';
 
 function cookieValue(headers: Headers, name: string) {
   const cookie = headers.get("cookie") || "";
@@ -32,15 +33,27 @@ async function hmacKey() {
   );
 }
 
+async function sessionTable() {
+  if(!env.DB)throw Error("Database unavailable");
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, expires INTEGER NOT NULL)").run();
+}
+
 async function validSession(headers: Headers) {
   const token = cookieValue(headers, COOKIE_NAME);
-  const key = await hmacKey();
-  if (!token || !key) return false;
-  const [expiresText, signatureText] = token.split(".");
-  const expires = Number(expiresText);
-  const signature = signatureText && hexToBytes(signatureText);
-  if (!Number.isSafeInteger(expires) || expires <= Date.now() || !signature) return false;
-  return crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(expiresText));
+  if(!token||!env.DB)return false;
+  const parts=token.split(".");
+  if(parts.length!==4||parts[0]!==SESSION_PREFIX)return false;
+  const [version,id,expiresText,signatureText]=parts;
+  if(!/^[a-f0-9]{64}$/.test(id)||!/^\d{13}$/.test(expiresText)||!(/^[a-f0-9]{64}$/.test(signatureText)))return false;
+  const expires=Number(expiresText);
+  if(!Number.isSafeInteger(expires)||expires<=Date.now())return false;
+  try{
+    const key=await hmacKey();
+    const signature=hexToBytes(signatureText);
+    if(!key||!signature||!(await crypto.subtle.verify("HMAC",key,signature,new TextEncoder().encode([version,id,expiresText].join(".")))))return false;
+    const row=await env.DB.prepare("SELECT expires FROM admin_sessions WHERE id=?").bind(id).first<{expires:number}>();
+    return row?.expires===expires;
+  }catch{return false;}
 }
 
 async function sameSecret(provided: string, expected: string) {
@@ -59,25 +72,37 @@ async function sameSecret(provided: string, expected: string) {
 }
 
 export async function isAdminRequest(headers: Headers) {
-  const configuredEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
-  const authenticatedEmail = (
-    headers.get("oai-authenticated-user-email") ||
-    headers.get("cf-access-authenticated-user-email") ||
-    ""
-  ).trim().toLowerCase();
-
-  if (configuredEmail && authenticatedEmail && configuredEmail === authenticatedEmail) return true;
+  // Never trust externally supplied identity headers without verified assertions.
   return validSession(headers);
 }
 
 export async function createAdminSession(password: string) {
-  if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_SECRET) return null;
+  if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_SECRET || !env.DB) return null;
   if (!(await sameSecret(password, env.ADMIN_PASSWORD))) return null;
   const expires = Date.now() + SESSION_SECONDS * 1000;
   const key = await hmacKey();
   if (!key) return null;
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(String(expires)));
-  return `${expires}.${bytesToHex(new Uint8Array(signature))}`;
+  await sessionTable();
+  const id=bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+  const payload=[SESSION_PREFIX,id,String(expires)].join(".");
+  const signature=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(payload));
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM admin_sessions WHERE expires<=?").bind(Date.now()),
+    env.DB.prepare("INSERT INTO admin_sessions(id,expires) VALUES(?,?)").bind(id,expires),
+  ]);
+  return payload+"."+bytesToHex(new Uint8Array(signature));
+}
+
+export async function revokeAdminSession(headers:Headers){
+  const token=cookieValue(headers,COOKIE_NAME);
+  if(!token)return;
+  const parts=token.split(".");
+  if(parts.length!==4||parts[0]!==SESSION_PREFIX||!/^[a-f0-9]{64}$/.test(parts[1])||!/^\d{13}$/.test(parts[2])||!/^[a-f0-9]{64}$/.test(parts[3]))return;
+  const key=await hmacKey();
+  const signature=hexToBytes(parts[3]);
+  if(!key||!signature||!await crypto.subtle.verify("HMAC",key,signature,new TextEncoder().encode(parts.slice(0,3).join("."))))return;
+  if(!env.DB)throw Error("Database unavailable");
+  await env.DB.prepare("DELETE FROM admin_sessions WHERE id=?").bind(parts[1]).run();
 }
 
 export function adminSessionCookie(token: string) {
