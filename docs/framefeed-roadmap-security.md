@@ -22,3 +22,13 @@
 - Launch gate: resolve critical/high findings or explicitly document accepted residual risks; verify runtime configuration and privacy controls.
 
 Status: backlog / not yet performed. No claim that FrameFeed is secure or vulnerability-free.
+
+
+## Authenticated reader interactions (after account security gate)
+- Introduce distinct reader accounts and revocable sessions; reader login must never confer journal-owner permissions. Require verified identity and tenant-aware access checks before accepting interactions.
+- Comments: authenticated readers can submit plain-text comments on visible posts, delete their own, and see published comments with public display name/avatar and date. Journal owners can moderate/delete comments on their own journal only; anonymous visitors cannot submit. Decide whether comments are publicly readable and whether approval is required before enabling.
+- Likes: one like per authenticated account per post, with unlike support; enforce a unique journal/post/account key in D1. Keep public like counts and identity lists hidden; provide a private owner-only list of public display names/avatars for each post, never email addresses. Keep existing owner favourites separate from reader likes.
+- Data model: stable account, journal and post IDs; comments with author ID, body and timestamps; likes with account ID and timestamp. Validate membership/visibility and ownership server-side on every request, including moderation and listing. Cascade or clean up interactions on post/account deletion.
+- Abuse/privacy: same-origin CSRF protection, rate limits, comment length limits, escaped text rendering, pagination, blocking/reporting or moderation, account deletion and privacy notice updates. No public launch until staging tests cover spoofing, duplicate likes, unauthorized reads/writes and cross-journal isolation.
+- UI: discreet comment and like controls under posts; owner-only “Liked by” panel; no public popularity rankings. Preserve anonymous browsing of public journals.
+- Implementation dependency: existing production authentication is single-owner only. Do not reuse the administrator password/session for readers or ship interactive write endpoints before reader identity and isolation are in place.
