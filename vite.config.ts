@@ -29,6 +29,7 @@ const localBindingConfig = {
     ? {
         routes: [
           { pattern: "framefeed.co.uk", custom_domain: true },
+          { pattern: "www.framefeed.co.uk", custom_domain: true },
           { pattern: "toby.framefeed.co.uk", custom_domain: true },
           { pattern: "frfd.uk", custom_domain: true },
           { pattern: "www.frfd.uk", custom_domain: true },
