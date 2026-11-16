@@ -30,8 +30,8 @@ jobs:
           Object.assign(p.dependencies,{react:'19.3.1','react-dom':'19.3.1',next:'16.4.5'});
           Object.assign(p.devDependencies,{'react-server-dom-webpack':'19.3.1','@vitejs/plugin-rsc':'0.5.39','@vitejs/plugin-react':'6.2.1','eslint-config-next':'16.4.5',vinext:'1.4.4',vite:'8.1.6'});
           p.dependencies.zod='4.6.6';
-          const overrides={'miniflare>sharp':'0.35.5','@vercel/og>sharp':'0.35.5','eslint-plugin-react-hooks>zod':'4.6.6','zod-validation-error>zod':'4.6.6','undici@>=7.0.0 <7.30.1':'7.30.1','ws@>=8.0.0 <8.21.0':'8.21.0','brace-expansion@<1.1.20':'1.1.20','brace-expansion@>=3.0.0 <5.0.11':'5.0.11','js-yaml@>=4.0.0 <4.3.2':'4.3.2','browserslist@<=4.28.6':'4.28.7','source-map-js@>=1.0.0 <1.2.2':'1.2.2'};
-          p.overrides={...p.overrides,...overrides};
+          const overrides={'miniflare>sharp':'0.35.5','@vercel/og>sharp':'0.35.5','eslint-plugin-react-hooks>zod':'4.6.6','zod-validation-error>zod':'4.6.6','undici@>=7.0.0 <7.30.1':'7.30.1','ws@>=8.0.0 <8.21.0':'8.21.0','brace-expansion@<1.1.21':'1.1.21','brace-expansion@>=3.0.0 <5.0.12':'5.0.12','js-yaml@>=4.0.0 <4.3.2':'4.3.2','browserslist@<=4.28.6':'4.28.7','source-map-js@>=1.0.0 <1.2.2':'1.2.2','esbuild@<=0.24.2':'0.25.0','esbuild@>=0.27.3 <0.28.1':'0.28.1','@babel/core@<=7.29.0':'7.29.6','fflate@>=0.7.0 <0.7.5':'0.7.5','baseline-browser-mapping@>=2.0.0 <2.11.0':'2.11.0','fast-uri@>=3.0.0 <3.1.9':'3.1.9','minimatch@>=7.0.0 <11.0.1':'11.0.1'};
+          p.overrides=overrides;
           const workspace=fs.readFileSync('pnpm-workspace.yaml','utf8').replace(/\noverrides:[\s\S]*$/,'');
           fs.writeFileSync('pnpm-workspace.yaml',workspace+'\n overrides:\n'.replace(' overrides:','overrides:')+Object.entries(overrides).map(([k,v])=>'  '+JSON.stringify(k)+': '+JSON.stringify(v)).join('\n')+'\n');
           fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
@@ -42,10 +42,15 @@ jobs:
         run: pnpm run build
         env:
           FRAMEFEED_DEPLOY: '1'
+      - name: Smoke test patched development libraries
+        run: |
+          pnpm exec drizzle-kit --version
+          pnpm exec eslint --version
+          pnpm exec eslint --print-config app/page.tsx > /dev/null
       - name: Audit complete dependency tree
         run: |
           pnpm audit --json > security-audit.json || true
-          pnpm audit --audit-level=high
+          pnpm audit --audit-level=low
       - name: Save candidate manifest and lockfile for review
         if: always() && hashFiles('security-audit.json') != ''
         uses: actions/upload-artifact@v4
