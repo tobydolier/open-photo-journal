@@ -59,15 +59,21 @@ function DemoPhoto({photo,index=0,imageRef}:{photo:FeaturedPhoto|null;index?:num
   </span>;
 }
 
-function frameClass(style:FrameStyle,prefix:"photo"|"lightbox"="photo"){
+function frameVariant(id:string){
+  let hash=0;
+  for(const character of id)hash=(hash*31+character.charCodeAt(0))>>>0;
+  return hash%3;
+}
+
+function frameClass(style:FrameStyle,prefix:"photo"|"lightbox"="photo",postId?:string){
   if(!style)return "ff-frame-unframed";
-  return `${prefix}-frame-${style}${style==="ornate"?" frame-variant-1":""}`;
+  return `${prefix}-frame-${style}${style==="ornate"?` frame-variant-${postId?frameVariant(postId):0}`:""}`;
 }
 
 function LandingArtwork({photo,index,style}:{photo:FeaturedPhoto|null;index:number;style:Exclude<FrameStyle,"">}){
   const mountStyle={"--mahogany-mount":"#c9d2c8","--pine-mount":"#e5e0d5"} as CSSProperties;
   return <div className={`ff-gallery-art ff-gallery-art-${index+1}`}>
-    <div className={`ff-gallery-frame ${frameClass(style)}`} style={mountStyle}>
+    <div className={`ff-gallery-frame ${frameClass(style,"photo",photo?.postId)}`} style={mountStyle}>
       <div className="photo-open"><DemoPhoto photo={photo} index={index+1}/></div>
     </div>
     <span>{photo?.caption||["A favourite place","Light, kept","A quiet afternoon"][index]}</span>
@@ -166,7 +172,7 @@ export default function WelcomePage(){
         <div className="ff-frame-lab" id="frames">
           <div className="ff-lab-head"><div><span>LIVE PREVIEW</span><b>{frameOptions.find(option=>option.style===demoFrame)?.name}</b></div><button type="button" onClick={()=>setViewerOpen(true)}><Maximize2 size={14}/> Full screen</button></div>
           <div className="ff-demo-stage">
-            <div className={`ff-demo-frame ${frameClass(demoFrame)}`} style={demoMountStyle}>
+            <div className={`ff-demo-frame ${frameClass(demoFrame,"photo",demoPhoto?.postId)}`} style={demoMountStyle}>
               <div className="photo-open"><DemoPhoto photo={demoPhoto} imageRef={previewImageRef}/></div>
             </div>
           </div>
@@ -252,7 +258,7 @@ export default function WelcomePage(){
 
     {viewerOpen&&<div className="ff-viewer" role="dialog" aria-modal="true" aria-label={`${frameOptions.find(option=>option.style===demoFrame)?.name} frame in full screen`} onMouseDown={event=>{if(event.target===event.currentTarget)setViewerOpen(false);}}>
       <button className="ff-viewer-close" type="button" aria-label="Close full-screen preview" onClick={()=>setViewerOpen(false)}><X size={20}/></button>
-      <div className={`ff-viewer-frame ${frameClass(demoFrame,"lightbox")}`} style={demoMountStyle}><div className="lightbox-mount"><DemoPhoto photo={demoPhoto}/></div></div>
+      <div className={`ff-viewer-frame ${frameClass(demoFrame,"lightbox",demoPhoto?.postId)}`} style={demoMountStyle}><div className="lightbox-mount"><DemoPhoto photo={demoPhoto}/></div></div>
       <span className="ff-viewer-label">{frameOptions.find(option=>option.style===demoFrame)?.name}</span>
     </div>}
   </div>;
