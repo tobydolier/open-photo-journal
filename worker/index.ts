@@ -37,6 +37,9 @@ const worker = {
     // domain becomes the platform landing; personal subdomains stay journals.
     const url = new URL(request.url);
     const host = url.hostname.toLowerCase();
+    if (host === "www.framefeed.co.uk") {
+      return Response.redirect("https://framefeed.co.uk" + url.pathname + url.search, 308);
+    }
     if (host === "frfd.uk" || host === "www.frfd.uk") {
       if (url.pathname === "/") return Response.redirect("https://framefeed.co.uk/", 302);
       const code = decodeURIComponent(url.pathname.slice(1));
