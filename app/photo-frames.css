@@ -165,3 +165,46 @@
   .gallery-frame.photo-frame-ornate{--ornate-edge:8px}
   .lightbox-frame-ornate{--lightbox-edge-total:24px!important;--lightbox-content-total:52px!important}
 }
+
+
+/* Journal fullscreen: budget space for the actual moulding AND mount before
+   sizing the image. Neither the frame nor the mount should stretch to fill
+   the viewport; the photograph's intrinsic aspect ratio sets both dimensions. */
+.lightbox .lightbox-photo-frame{
+  --viewer-width:calc(100vw - 128px);
+  --viewer-height:calc(100dvh - 132px);
+  --viewer-frame-edge:0px;
+  --viewer-mount-edge:0px;
+  --viewer-mount-gap:0px;
+  --viewer-clearance:0px;
+  display:flex;flex:none;align-items:center;justify-content:center;
+  width:max-content;height:max-content;min-width:0;min-height:0;
+  max-width:calc(var(--viewer-width) - var(--viewer-clearance));
+  max-height:calc(var(--viewer-height) - var(--viewer-clearance));
+  box-sizing:border-box;
+}
+.lightbox .lightbox-frame-white{--viewer-frame-edge:12px;--viewer-mount-gap:clamp(16px,3vw,42px)}
+.lightbox .lightbox-frame-black{--viewer-frame-edge:18px;--viewer-mount-gap:clamp(16px,3vw,42px)}
+.lightbox .lightbox-frame-mahogany{--viewer-frame-edge:23px;--viewer-mount-edge:5px;--viewer-mount-gap:clamp(16px,3vw,42px)}
+.lightbox .lightbox-frame-pine{--viewer-frame-edge:16px;--viewer-mount-edge:1px;--viewer-mount-gap:clamp(16px,3vw,42px)}
+.lightbox .lightbox-frame-ornate{--viewer-frame-edge:var(--ornate-edge);--viewer-mount-edge:2px;--viewer-mount-gap:clamp(16px,3vw,42px);--viewer-clearance:24px;--viewer-frame-edge:28px;border-image-repeat:round}
+.lightbox .lightbox-photo-frame .lightbox-mount{
+  display:flex;flex:none;align-items:center;justify-content:center;
+  width:max-content;height:max-content;min-width:0;min-height:0;
+  max-width:none;max-height:none;
+  padding:var(--viewer-mount-gap)!important;box-sizing:border-box;
+}
+.lightbox .lightbox-photo-frame .lightbox-mount img{
+  display:block;flex:none;width:auto;height:auto;min-width:0;min-height:0;
+  max-width:max(1px,calc(var(--viewer-width) - var(--viewer-clearance) - 2 * (var(--viewer-frame-edge) + var(--viewer-mount-edge) + var(--viewer-mount-gap))));
+  max-height:max(1px,calc(var(--viewer-height) - var(--viewer-clearance) - 2 * (var(--viewer-frame-edge) + var(--viewer-mount-edge) + var(--viewer-mount-gap))));
+  object-fit:contain;
+}
+@media(max-width:760px){
+  .lightbox .lightbox-photo-frame{--viewer-width:calc(100vw - 96px);--viewer-height:calc(100dvh - 165px)}
+  .lightbox .lightbox-frame-white{--viewer-frame-edge:9px;--viewer-mount-gap:14px}
+  .lightbox .lightbox-frame-black{--viewer-frame-edge:11px;--viewer-mount-gap:14px}
+  .lightbox .lightbox-frame-mahogany{--viewer-frame-edge:12px;--viewer-mount-edge:3px;--viewer-mount-gap:14px}
+  .lightbox .lightbox-frame-pine{--viewer-frame-edge:9px;--viewer-mount-gap:14px}
+  .lightbox .lightbox-frame-ornate{--viewer-frame-edge:12px;--viewer-mount-gap:14px;--viewer-clearance:10px}
+}
